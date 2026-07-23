@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SteamDisc.Core\SteamDisc.Core.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Art\SteamDisc.Art.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Authoring\SteamDisc.Authoring.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Imaging\SteamDisc.Imaging.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Covers\SteamDisc.Covers.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Install\SteamDisc.Install.csproj" />
+    <ProjectReference Include="..\..\src\SteamDisc.Builder\SteamDisc.Builder.csproj" />
+  </ItemGroup>
+
+</Project>

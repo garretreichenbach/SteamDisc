@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteamDisc.Core\SteamDisc.Core.csproj" />
+    <ProjectReference Include="..\SteamDisc.Install\SteamDisc.Install.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Setup</AssemblyName>
+    <RootNamespace>SteamDisc.Runtime</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Publish defaults for the disc runtime.
+
+    Self-contained and single-file, because this has to run on a machine with no .NET installed
+    and it has to be one file in the disc root next to autorun.inf.
+
+    Trimming is deliberately OFF. The trimmer cannot see through System.Text.Json's reflection,
+    so the very first thing the runtime does — read payload.json — is exactly what a trimmed
+    build could break, and it would break silently on somebody else's machine rather than here.
+    The plan's own answer applies: on a 25 GB disc the difference between a 10 MB and a 70 MB
+    installer does not matter. Turn this on only alongside source-generated serialisation, and
+    only after testing a published build end to end.
+  -->
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+</Project>

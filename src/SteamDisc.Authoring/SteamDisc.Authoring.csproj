@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteamDisc.Core\SteamDisc.Core.csproj" />
+    <ProjectReference Include="..\SteamDisc.Imaging\SteamDisc.Imaging.csproj" />
+  </ItemGroup>
+
+</Project>

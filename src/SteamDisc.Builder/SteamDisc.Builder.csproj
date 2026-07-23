@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteamDisc.Core\SteamDisc.Core.csproj" />
+    <ProjectReference Include="..\SteamDisc.Art\SteamDisc.Art.csproj" />
+    <ProjectReference Include="..\SteamDisc.Authoring\SteamDisc.Authoring.csproj" />
+    <ProjectReference Include="..\SteamDisc.Imaging\SteamDisc.Imaging.csproj" />
+    <ProjectReference Include="..\SteamDisc.Covers\SteamDisc.Covers.csproj" />
+    <ProjectReference Include="..\SteamDisc.Install\SteamDisc.Install.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+</Project>
