@@ -73,6 +73,50 @@ public class DiscSpanPlannerTests
     }
 
     [Fact]
+    public void A_dvd_sized_game_lands_on_one_dvd()
+    {
+        // 4.0 GB is comfortably inside a DVD once the per-disc overhead is taken out.
+        Assert.Equal(1, DiscSpanPlanner.EstimateDiscCount(4_000_000_000, OpticalMedium.Dvd));
+
+        // 6 GB is not, and must be reported as two rather than silently overflowing one.
+        Assert.Equal(2, DiscSpanPlanner.EstimateDiscCount(6_000_000_000, OpticalMedium.Dvd));
+    }
+
+    [Fact]
+    public void Dvd_volumes_are_sized_to_divide_into_the_medium()
+    {
+        var volumeSize = DiscSpanPlanner.ChooseVolumeSize(OpticalMedium.Dvd);
+        var usable = OpticalMedium.Dvd.UsableForPayload(DiscSpanPlanner.PerDiscOverheadBytes);
+
+        // Several volumes per disc: small enough that one damaged volume costs little, large
+        // enough that per-volume overhead stays irrelevant.
+        Assert.InRange(usable / volumeSize, 4, 16);
+        Assert.True(volumeSize < 4L * 1024 * 1024 * 1024, "volumes must stay inside the ISO 9660 file size limit");
+    }
+
+    [Fact]
+    public void A_game_larger_than_a_dvd_spans_two_and_fills_the_first()
+    {
+        var volumeSize = DiscSpanPlanner.ChooseVolumeSize(OpticalMedium.Dvd);
+        var usable = OpticalMedium.Dvd.UsableForPayload(DiscSpanPlanner.PerDiscOverheadBytes);
+
+        // Enough whole volumes to overflow one disc by a little.
+        var count = (int)(usable / volumeSize) + 2;
+        var volumes = Enumerable.Range(1, count).Select(i => Volume(i, volumeSize)).ToList();
+
+        var plan = DiscSpanPlanner.Assign(volumes, OpticalMedium.Dvd);
+
+        Assert.Equal(2, plan.DiscCount);
+        Assert.True(plan.BytesOnDisc(1) <= usable);
+        Assert.True(plan.BytesOnDisc(2) > 0);
+
+        // Disc one should be packed, not half-used: a spare disc costs real money.
+        Assert.True(
+            plan.BytesOnDisc(1) + volumeSize > usable,
+            $"disc 1 holds {plan.BytesOnDisc(1)} of {usable} usable bytes and another volume would have fit");
+    }
+
+    [Fact]
     public void Disc_count_can_be_estimated_before_packing()
     {
         var usable = OpticalMedium.BluRay.UsableForPayload(DiscSpanPlanner.PerDiscOverheadBytes);

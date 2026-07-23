@@ -2,6 +2,7 @@ using System.Globalization;
 using SteamDisc.Authoring;
 using SteamDisc.Core.Payload;
 using SteamDisc.Core.Steam;
+using SteamDisc.Imaging;
 
 namespace SteamDisc.Builder.Commands;
 
@@ -28,24 +29,69 @@ internal static class GameCommands
             return 0;
         }
 
-        Console.WriteLine($"{"AppID",-8} {"Size",12} {"Updated",-12} {"Fit",-8} Title");
-        Console.WriteLine(new string('-', 78));
+        // With a target medium named, show how many discs each game would take, so a candidate
+        // can be picked before anything is packaged.
+        var medium = command.Value("media") is { Length: > 0 } mediaId
+            ? OpticalMedium.Find(mediaId)
+            : null;
 
-        foreach (var game in games.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase))
+        if (command.Has("media") && medium is null)
+        {
+            Console.Error.WriteLine(
+                $"Unknown media '{command.Value("media")}'. Options: " +
+                string.Join(", ", OpticalMedium.All.Select(m => m.Id)) + ".");
+            return 1;
+        }
+
+        var discColumn = medium is null ? string.Empty : $" {"Discs",-6}";
+        Console.WriteLine($"{"AppID",-8} {"Size",12} {"Updated",-12} {"Fit",-8}{discColumn} Title");
+        Console.WriteLine(new string('-', medium is null ? 78 : 85));
+
+        var ordered = medium is null
+            ? games.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase)
+            : games.OrderBy(g => DiscsFor(g, medium)).ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase);
+
+        foreach (var game in ordered)
         {
             var size = game.MeasuredSize > 0 ? Format.Bytes(game.MeasuredSize) : "?";
             var updated = game.LastUpdated.ToUnixTimeSeconds() > 0
                 ? game.LastUpdated.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 : "unknown";
 
+            var discs = medium is null
+                ? string.Empty
+                : $" {DiscsFor(game, medium),-6}";
+
             Console.WriteLine(
-                $"{game.AppId,-8} {size,12} {updated,-12} {game.Suitability,-8} {game.Name}");
+                $"{game.AppId,-8} {size,12} {updated,-12} {game.Suitability,-8}{discs} {game.Name}");
         }
 
         Console.WriteLine();
         Console.WriteLine("'Fit' is a hint: Ideal = not patched in a year, Caveats = see 'inspect'.");
+
+        if (medium is not null)
+        {
+            Console.WriteLine();
+            Console.WriteLine(
+                $"'Discs' assumes {medium.Name} and no compression. That is the honest assumption: game");
+            Console.WriteLine(
+                "assets are already compressed, so packing usually saves a few percent, not a few gigabytes.");
+            Console.WriteLine(
+                $"About {Format.Bytes(DiscSpanPlanner.PerDiscOverheadBytes)} per disc is reserved for the runtime and image structures.");
+        }
+
         return 0;
     }
+
+    /// <summary>
+    /// Discs a game would need, assuming compression saves nothing. Deliberately pessimistic —
+    /// being told "one disc" and discovering it is two after a 40-minute pack is worse than
+    /// being pleasantly surprised.
+    /// </summary>
+    private static int DiscsFor(GameCandidate game, OpticalMedium medium)
+        => DiscSpanPlanner.EstimateDiscCount(
+            game.MeasuredSize > 0 ? game.MeasuredSize : game.ManifestSize,
+            medium);
 
     public static int Inspect(CommandLine command)
     {

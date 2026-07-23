@@ -192,6 +192,70 @@ dotnet run --project src/SteamDisc.Builder -- covers new --game 620 --art-dir ~/
 Print at 100% scale. Letting a print dialog "fit to page" will produce a cover that does not fit
 the case.
 
+## First run: prove it on a DVD-R
+
+Do the cheap steps in order. Each one can fail on its own, and only the last costs a disc.
+
+**1. Pick a candidate that fits.** This assumes no compression, which is the honest assumption —
+game assets are already packed, so expect a few percent, not a few gigabytes.
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- list --media dvd
+```
+
+**2. Check its manifest before spending any time on it.** A clean audit is the difference between
+a disc that installs offline and one that makes Steam re-download the game.
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- inspect <appid>
+```
+
+**3. Package it.** Publish the runtime first so the disc is self-contained.
+
+```bash
+dotnet publish src/SteamDisc.Runtime -c Release -r win-x64 -o publish/runtime
+```
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- package <appid> --media dvd --out D:	est --runtime publishuntime\Setup.exe
+```
+
+**4. Install from the staging folder — no disc needed.** This is the real test of the risky part.
+Uninstall the game in Steam first, and delete the folder if Steam leaves it behind.
+
+```bash
+D:	est\disc\Setup.exe
+```
+
+Restart Steam and watch the download counter. **Zero bytes means it worked.** If Steam starts
+downloading, the manifest was not faithful enough — `inspect` and the installer's warnings should
+name the field.
+
+**5. Build the image and check it fits before burning.** `--media dvd` refuses rather than
+producing an oversized ISO.
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- iso D:	est\disc --out D:	est\game.iso --media dvd
+```
+
+Mount the ISO and run `Setup.exe` from the mounted drive. That exercises everything the burned
+disc will do, including reading over a filesystem rather than a folder.
+
+**6. Only now burn it.**
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- burn D:	est\game.iso
+```
+
+Notes for a DVD-R test specifically:
+
+- `--compression maximum` is worth trying if a game is just over the line. It is much slower and
+  usually gains little, but "little" can be the difference between one disc and two.
+- If the game needs two discs, that path works and is tested, but do the folder install at step 4
+  first — a swap prompt failure after two burns is an expensive way to find a bug.
+- AutoPlay gives a *prompt*, not automatic execution. That is expected (spike S3); the disc is
+  designed around it.
+
 ## Verifying the risky part
 
 Spike S1 from the plan, in three steps. On a Windows machine with Steam:

@@ -129,7 +129,7 @@ internal static class BuilderProgram
             SteamDisc Builder - turn an owned Steam game into physical media.
 
             Commands:
-              list                          List installed games with a suitability hint
+              list [--media <id>]           List installed games; with --media, how many discs each needs
               inspect <appid|name>          Show a game's manifest, depots and advisories
               package <appid|name>          Package a game into disc staging folders
               iso <staging-folder>          Build a burnable ISO from a staging folder
@@ -175,7 +175,7 @@ internal static class BuilderProgram
               --proof                       Draw slot outlines when rendering
 
             Examples:
-              steamdisc list
+              steamdisc list --media dvd
               steamdisc package 620 --media bd-r --out ~/discs/portal2
               steamdisc iso ~/discs/portal2/disc --out ~/discs/portal2.iso
               steamdisc covers new --game 620 --template blank-bluray --out ~/discs/portal2/cover.json
