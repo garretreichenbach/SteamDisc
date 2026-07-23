@@ -217,14 +217,14 @@ dotnet publish src/SteamDisc.Runtime -c Release -r win-x64 -o publish/runtime
 ```
 
 ```bash
-dotnet run --project src/SteamDisc.Builder -- package <appid> --media dvd --out D:	est --runtime publishuntime\Setup.exe
+dotnet run --project src/SteamDisc.Builder -- package <appid> --media dvd --out D:\test --runtime publish/runtime/Setup.exe
 ```
 
 **4. Install from the staging folder — no disc needed.** This is the real test of the risky part.
 Uninstall the game in Steam first, and delete the folder if Steam leaves it behind.
 
 ```bash
-D:	est\disc\Setup.exe
+D:\test\disc\Setup.exe
 ```
 
 Restart Steam and watch the download counter. **Zero bytes means it worked.** If Steam starts
@@ -235,7 +235,7 @@ name the field.
 producing an oversized ISO.
 
 ```bash
-dotnet run --project src/SteamDisc.Builder -- iso D:	est\disc --out D:	est\game.iso --media dvd
+dotnet run --project src/SteamDisc.Builder -- iso D:\test\disc --out D:\test\game.iso --media dvd
 ```
 
 Mount the ISO and run `Setup.exe` from the mounted drive. That exercises everything the burned
@@ -244,7 +244,7 @@ disc will do, including reading over a filesystem rather than a folder.
 **6. Only now burn it.**
 
 ```bash
-dotnet run --project src/SteamDisc.Builder -- burn D:	est\game.iso
+dotnet run --project src/SteamDisc.Builder -- burn D:\test\game.iso
 ```
 
 Notes for a DVD-R test specifically:
