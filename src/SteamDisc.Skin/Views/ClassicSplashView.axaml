@@ -60,7 +60,9 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid Background="{Binding BackgroundBrush}">
+  <!-- Clipped to a rounded rect so the full-bleed art follows the corners too. -->
+  <Border CornerRadius="10" ClipToBounds="True" Background="{Binding BackgroundBrush}">
+    <Grid>
     <!-- Layer 1: full-bleed key art. Null source simply shows nothing. -->
     <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill" />
 
@@ -192,5 +194,6 @@
 
     <controls:SteamBadge Tint="{Binding TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
                          Margin="0,30,44,0" Opacity="0.85" />
-  </Grid>
+    </Grid>
+  </Border>
 </UserControl>

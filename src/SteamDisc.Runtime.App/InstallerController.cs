@@ -104,6 +104,10 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             if (_window is not null)
             {
                 _window.Title = $"{_manifest.Title} — Setup";
+
+                // The skin is clipped to rounded corners; paint the window beneath it in the
+                // theme's own background so the corners blend instead of showing system chrome.
+                _window.Background = BackgroundBrush;
             }
 
             (_window as MainWindow)?.SetLayout(_theme.Layout);
