@@ -22,7 +22,9 @@ jobs:
         include:
           - { rid: win-x64,   os: windows-latest }
           - { rid: linux-x64, os: ubuntu-latest }
-          - { rid: osx-x64,   os: macos-13 }
+          # Apple Silicon only for now: the Intel runner (macos-13) sits unclaimed in the queue.
+          # To restore Intel coverage, add { rid: osx-x64, os: macos-latest } — publishing the
+          # x64 runtime pack cross-RID from an arm64 runner works, it just can't be smoke-tested.
           - { rid: osx-arm64, os: macos-latest }
 
     steps:
