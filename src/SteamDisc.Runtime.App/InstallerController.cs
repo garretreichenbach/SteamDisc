@@ -277,12 +277,12 @@ public sealed class InstallerController : SkinnedInstallerViewModel
 
         _cts = new CancellationTokenSource();
 
-        // Launch follows the disc's own choice: if the author ticked "launch after install" the
-        // engine starts the game, otherwise the Play button on the completion screen does.
-        // Verification is the installer's own checkbox, so it is passed explicitly.
+        // Both post-install choices belong to whoever is installing, so both come from the
+        // welcome screen's checkboxes rather than from anything baked into the disc.
         var request = new InstallRequest(_manifest, _args.DiscRoot, library, _steam)
         {
             ValidateAfterInstall = VerifyAfterInstall,
+            Launch = LaunchWhenFinished,
         };
         var progress = new Progress<OperationProgress>(OnProgress);
 
