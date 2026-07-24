@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Globalization;
 using System.IO.Compression;
@@ -66,11 +67,21 @@ public sealed class SdzArchiveEngine : IArchiveEngine
             }
 
             var level = ToCompressionLevel(request.Compression);
+
+            // Deflate is the expensive, per-chunk-independent part of packing, so it runs on the
+            // thread pool while reads, SHA, and writes stay sequential. The window bounds how many
+            // chunks may be in flight — and therefore memory — not just how many cores are busy.
+            // Store does no CPU work, so it stays fully sequential and skips the pool hand-off.
+            var chunkWindow = level == CompressionLevel.NoCompression
+                ? 1
+                : Math.Max(2, Environment.ProcessorCount + 1);
+
             foreach (var file in plan.Files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 tracker.SetCurrentItem(file.RelativePath);
-                await WriteFileEntryAsync(writer, file, level, tracker, cancellationToken).ConfigureAwait(false);
+                await WriteFileEntryAsync(writer, file, level, chunkWindow, tracker, cancellationToken)
+                    .ConfigureAwait(false);
                 tracker.CompleteItem();
             }
 
@@ -98,6 +109,11 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         var header = await ReadHeaderAsync(reader, cancellationToken).ConfigureAwait(false);
         tracker.SetTotals(header.UncompressedBytes, header.EntryCount);
 
+        // Reads stay sequential — the volume stream is seek-free and may span physical discs —
+        // but inflate is per-chunk-independent CPU work, so it runs on the pool. Raw chunks
+        // carry no CPU cost and skip the hand-off, so an all-Store archive extracts sequentially.
+        var chunkWindow = Math.Max(2, Environment.ProcessorCount + 1);
+
         var files = 0;
         long bytes = 0;
 
@@ -119,7 +135,7 @@ public sealed class SdzArchiveEngine : IArchiveEngine
                 case SdzFormat.RecordFile:
                 {
                     var written = await ExtractFileAsync(
-                        reader, destination, request, tracker, cancellationToken).ConfigureAwait(false);
+                        reader, destination, request, chunkWindow, tracker, cancellationToken).ConfigureAwait(false);
                     files++;
                     bytes += written;
                     tracker.CompleteItem();
@@ -280,6 +296,7 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         BinaryWriter writer,
         SourceFile file,
         CompressionLevel level,
+        int chunkWindow,
         ProgressTracker tracker,
         CancellationToken cancellationToken)
     {
@@ -290,26 +307,81 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         writer.Flush();
 
         using var sha = SHA256.Create();
-        var buffer = new byte[SdzFormat.ChunkSize];
+        var pool = ArrayPool<byte>.Shared;
+
+        // Chunks are read in order, but their deflate work runs concurrently. Completed chunks
+        // wait in this FIFO so they are written back in exactly the order they were read — the
+        // stream is seek-free, and byte-identical output is what makes "did this disc change?"
+        // answerable by hashing. The window caps how far read can run ahead of write.
+        var inFlight = new Queue<PendingChunk>(chunkWindow);
         long actual = 0;
 
-        await using (var input = new FileStream(
-                         file.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, useAsync: true))
+        // Drains one completed chunk from the head of the queue and writes it in order.
+        async Task WriteHeadChunkAsync()
         {
+            var pending = inFlight.Dequeue();
+            var result = await pending.Work.ConfigureAwait(false);
+
+            writer.Write(result.StoredLength);
+            writer.Write(result.OriginalLength);
+            writer.Write(result.Compression);
+            writer.Write(result.Stored.AsSpan(0, result.StoredLength));
+            tracker.AddBytes(result.OriginalLength);
+
+            pool.Return(pending.RawBuffer);
+        }
+
+        try
+        {
+            await using var input = new FileStream(
+                file.FullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, useAsync: true);
+
             while (true)
             {
-                var read = await ReadChunkAsync(input, buffer, cancellationToken).ConfigureAwait(false);
+                var raw = pool.Rent(SdzFormat.ChunkSize);
+                var read = await ReadChunkAsync(input, raw, SdzFormat.ChunkSize, cancellationToken)
+                    .ConfigureAwait(false);
                 if (read == 0)
                 {
+                    pool.Return(raw);
                     break;
                 }
 
-                sha.TransformBlock(buffer, 0, read, null, 0);
+                // SHA is a single running hash over the file, so it has to advance in read order.
+                // It is cheap next to deflate, so keeping it on this thread costs little.
+                sha.TransformBlock(raw, 0, read, null, 0);
                 actual += read;
 
-                WriteChunk(writer, buffer.AsSpan(0, read), level);
-                tracker.AddBytes(read);
+                var work = chunkWindow == 1
+                    ? Task.FromResult(CompressChunk(raw, read, level))
+                    : Task.Run(() => CompressChunk(raw, read, level), cancellationToken);
+                inFlight.Enqueue(new PendingChunk(work, raw));
+
+                if (inFlight.Count >= chunkWindow)
+                {
+                    await WriteHeadChunkAsync().ConfigureAwait(false);
+                }
             }
+
+            while (inFlight.Count > 0)
+            {
+                await WriteHeadChunkAsync().ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            // On failure, hand every still-pending buffer back so a mid-build error does not
+            // bleed the pool. Awaiting the faulted tasks here would just rethrow, so observe
+            // them without propagating a second exception.
+            while (inFlight.Count > 0)
+            {
+                var pending = inFlight.Dequeue();
+                _ = pending.Work.ContinueWith(
+                    static t => _ = t.Exception, TaskScheduler.Default);
+                pool.Return(pending.RawBuffer);
+            }
+
+            throw;
         }
 
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
@@ -320,12 +392,14 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         writer.Flush();
     }
 
-    private static async Task<int> ReadChunkAsync(Stream input, byte[] buffer, CancellationToken cancellationToken)
+    private static async Task<int> ReadChunkAsync(
+        Stream input, byte[] buffer, int count, CancellationToken cancellationToken)
     {
         var total = 0;
-        while (total < buffer.Length)
+        while (total < count)
         {
-            var read = await input.ReadAsync(buffer.AsMemory(total), cancellationToken).ConfigureAwait(false);
+            var read = await input.ReadAsync(buffer.AsMemory(total, count - total), cancellationToken)
+                .ConfigureAwait(false);
             if (read == 0)
             {
                 break;
@@ -337,28 +411,25 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         return total;
     }
 
-    private static void WriteChunk(BinaryWriter writer, ReadOnlySpan<byte> data, CompressionLevel level)
+    /// <summary>
+    /// Compresses one chunk, off the calling thread. Pure and self-contained — it touches no
+    /// shared state — so any number of these run in parallel safely.
+    /// </summary>
+    private static ChunkResult CompressChunk(byte[] raw, int length, CompressionLevel level)
     {
-        byte compression = SdzFormat.ChunkRaw;
-        ReadOnlySpan<byte> payload = data;
-        byte[]? compressed = null;
-
         if (level != CompressionLevel.NoCompression)
         {
-            compressed = Deflate(data, level);
+            var compressed = Deflate(raw.AsSpan(0, length), level);
             // Only keep the compressed form when it actually helps. Game data is largely
             // pre-compressed, so a per-chunk decision beats a per-archive one.
-            if (compressed.Length < data.Length)
+            if (compressed.Length < length)
             {
-                compression = SdzFormat.ChunkDeflate;
-                payload = compressed;
+                return new ChunkResult(compressed, compressed.Length, length, SdzFormat.ChunkDeflate);
             }
         }
 
-        writer.Write(payload.Length);
-        writer.Write(data.Length);
-        writer.Write(compression);
-        writer.Write(payload);
+        // Stored raw: the payload is the source buffer itself, so nothing extra is allocated.
+        return new ChunkResult(raw, length, length, SdzFormat.ChunkRaw);
     }
 
     private static byte[] Deflate(ReadOnlySpan<byte> data, CompressionLevel level)
@@ -405,6 +476,7 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         VolumeReaderStream reader,
         string destinationRoot,
         ArchiveExtractRequest request,
+        int chunkWindow,
         ProgressTracker tracker,
         CancellationToken cancellationToken)
     {
@@ -446,73 +518,119 @@ public sealed class SdzArchiveEngine : IArchiveEngine
                 }
             }
 
-            var storedBuffer = Array.Empty<byte>();
-            var plainBuffer = Array.Empty<byte>();
+            var pool = ArrayPool<byte>.Shared;
 
-            while (true)
+            // Stored chunks are read in order, but their inflate work runs concurrently. Results
+            // are drained from the head of this FIFO so bytes are written — and hashed — in the
+            // original order, which the running SHA and the sequential output stream both require.
+            var inFlight = new Queue<PendingInflate>(chunkWindow);
+
+            // Drains one completed chunk from the head of the queue: writes it, hashes it, and
+            // returns its buffers to the pool.
+            async Task WriteHeadChunkAsync()
             {
-                var storedLength = await ReadInt32Async(reader, cancellationToken).ConfigureAwait(false);
-                if (storedLength == 0)
-                {
-                    break;
-                }
+                var pending = inFlight.Dequeue();
+                var plain = await pending.Work.ConfigureAwait(false);
 
-                if (storedLength < 0 || storedLength > SdzFormat.ChunkSize * 4)
-                {
-                    throw new ArchiveIntegrityException(
-                        $"Chunk length {storedLength} in '{relative}' is out of range; the volume is damaged.");
-                }
-
-                var originalLength = await ReadInt32Async(reader, cancellationToken).ConfigureAwait(false);
-                if (originalLength < 0 || originalLength > SdzFormat.ChunkSize)
-                {
-                    throw new ArchiveIntegrityException(
-                        $"Chunk size {originalLength} in '{relative}' is out of range; the volume is damaged.");
-                }
-
-                var compression = await ReadByteAsync(reader, cancellationToken).ConfigureAwait(false);
-
-                if (storedBuffer.Length < storedLength)
-                {
-                    storedBuffer = new byte[storedLength];
-                }
-
-                await reader
-                    .ReadExactlyOrThrowAsync(storedBuffer.AsMemory(0, storedLength), cancellationToken)
+                await output.WriteAsync(plain.AsMemory(0, pending.OriginalLength), cancellationToken)
                     .ConfigureAwait(false);
+                sha.TransformBlock(plain, 0, pending.OriginalLength, null, 0);
 
-                byte[] plainArray;
-                if (compression == SdzFormat.ChunkDeflate)
+                written += pending.OriginalLength;
+                tracker.AddBytes(pending.OriginalLength);
+
+                pool.Return(pending.StoredBuffer);
+                if (!pending.PlainIsStored)
                 {
-                    if (plainBuffer.Length < originalLength)
+                    pool.Return(plain);
+                }
+            }
+
+            try
+            {
+                while (true)
+                {
+                    var storedLength = await ReadInt32Async(reader, cancellationToken).ConfigureAwait(false);
+                    if (storedLength == 0)
                     {
-                        plainBuffer = new byte[originalLength];
+                        break;
                     }
 
-                    Inflate(storedBuffer.AsSpan(0, storedLength), plainBuffer.AsSpan(0, originalLength), relative);
-                    plainArray = plainBuffer;
-                }
-                else if (compression == SdzFormat.ChunkRaw)
-                {
-                    if (storedLength != originalLength)
+                    if (storedLength < 0 || storedLength > SdzFormat.ChunkSize * 4)
                     {
                         throw new ArchiveIntegrityException(
-                            $"Raw chunk in '{relative}' declares {storedLength} stored and {originalLength} original bytes.");
+                            $"Chunk length {storedLength} in '{relative}' is out of range; the volume is damaged.");
                     }
 
-                    plainArray = storedBuffer;
+                    var originalLength = await ReadInt32Async(reader, cancellationToken).ConfigureAwait(false);
+                    if (originalLength < 0 || originalLength > SdzFormat.ChunkSize)
+                    {
+                        throw new ArchiveIntegrityException(
+                            $"Chunk size {originalLength} in '{relative}' is out of range; the volume is damaged.");
+                    }
+
+                    var compression = await ReadByteAsync(reader, cancellationToken).ConfigureAwait(false);
+
+                    var storedBuffer = pool.Rent(storedLength);
+                    await reader
+                        .ReadExactlyOrThrowAsync(storedBuffer.AsMemory(0, storedLength), cancellationToken)
+                        .ConfigureAwait(false);
+
+                    Task<byte[]> work;
+                    bool plainIsStored;
+                    if (compression == SdzFormat.ChunkDeflate)
+                    {
+                        plainIsStored = false;
+                        var sLen = storedLength;
+                        var oLen = originalLength;
+                        var buffer = storedBuffer;
+                        work = Task.Run(() => InflateChunk(buffer, sLen, oLen, relative), cancellationToken);
+                    }
+                    else if (compression == SdzFormat.ChunkRaw)
+                    {
+                        if (storedLength != originalLength)
+                        {
+                            pool.Return(storedBuffer);
+                            throw new ArchiveIntegrityException(
+                                $"Raw chunk in '{relative}' declares {storedLength} stored and {originalLength} original bytes.");
+                        }
+
+                        // The plaintext is the stored bytes verbatim; no CPU work, no extra buffer.
+                        plainIsStored = true;
+                        work = Task.FromResult(storedBuffer);
+                    }
+                    else
+                    {
+                        pool.Return(storedBuffer);
+                        throw new ArchiveIntegrityException(
+                            $"Unknown chunk compression 0x{compression:X2} in '{relative}'.");
+                    }
+
+                    inFlight.Enqueue(new PendingInflate(work, storedBuffer, originalLength, plainIsStored));
+
+                    if (inFlight.Count >= chunkWindow)
+                    {
+                        await WriteHeadChunkAsync().ConfigureAwait(false);
+                    }
                 }
-                else
+
+                while (inFlight.Count > 0)
                 {
-                    throw new ArchiveIntegrityException(
-                        $"Unknown chunk compression 0x{compression:X2} in '{relative}'.");
+                    await WriteHeadChunkAsync().ConfigureAwait(false);
+                }
+            }
+            catch
+            {
+                // Return every still-pending buffer so a damaged volume mid-file does not bleed
+                // the pool. Observe the faulted tasks without rethrowing a second exception.
+                while (inFlight.Count > 0)
+                {
+                    var pending = inFlight.Dequeue();
+                    _ = pending.Work.ContinueWith(static t => _ = t.Exception, TaskScheduler.Default);
+                    pool.Return(pending.StoredBuffer);
                 }
 
-                await output.WriteAsync(plainArray.AsMemory(0, originalLength), cancellationToken).ConfigureAwait(false);
-                sha.TransformBlock(plainArray, 0, originalLength, null, 0);
-
-                written += originalLength;
-                tracker.AddBytes(originalLength);
+                throw;
             }
 
             // Trim any preallocated tail that the actual content did not fill.
@@ -561,27 +679,43 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         return written;
     }
 
-    private static void Inflate(ReadOnlySpan<byte> stored, Span<byte> destination, string relativePath)
+    /// <summary>
+    /// Inflates one chunk, off the calling thread. Pure and self-contained apart from renting its
+    /// output from the shared pool, so any number of these run in parallel safely. The caller
+    /// returns the rented buffer once the chunk has been written.
+    /// </summary>
+    private static byte[] InflateChunk(byte[] stored, int storedLength, int originalLength, string relativePath)
     {
-        using var input = new MemoryStream(stored.ToArray(), writable: false);
-        using var deflate = new DeflateStream(input, CompressionMode.Decompress);
-
-        var total = 0;
-        while (total < destination.Length)
+        var destination = ArrayPool<byte>.Shared.Rent(originalLength);
+        try
         {
-            var read = deflate.Read(destination[total..]);
-            if (read == 0)
+            using var input = new MemoryStream(stored, 0, storedLength, writable: false);
+            using var deflate = new DeflateStream(input, CompressionMode.Decompress);
+
+            var total = 0;
+            while (total < originalLength)
             {
-                break;
+                var read = deflate.Read(destination, total, originalLength - total);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                total += read;
             }
 
-            total += read;
-        }
+            if (total != originalLength)
+            {
+                throw new ArchiveIntegrityException(
+                    $"A compressed chunk of '{relativePath}' expanded to {total} bytes instead of {originalLength}.");
+            }
 
-        if (total != destination.Length)
+            return destination;
+        }
+        catch
         {
-            throw new ArchiveIntegrityException(
-                $"A compressed chunk of '{relativePath}' expanded to {total} bytes instead of {destination.Length}.");
+            ArrayPool<byte>.Shared.Return(destination);
+            throw;
         }
     }
 
@@ -726,6 +860,31 @@ public sealed class SdzArchiveEngine : IArchiveEngine
         string RelativePath,
         long Length,
         DateTime LastWriteUtc);
+
+    /// <summary>The framed result of compressing one chunk, ready to write.</summary>
+    /// <param name="Stored">Bytes to write — either a fresh deflate buffer or the raw chunk.</param>
+    /// <param name="StoredLength">Valid byte count within <paramref name="Stored"/>.</param>
+    /// <param name="OriginalLength">Uncompressed length, written to the chunk header.</param>
+    /// <param name="Compression">Chunk compression flag; see <see cref="SdzFormat"/>.</param>
+    private readonly record struct ChunkResult(
+        byte[] Stored,
+        int StoredLength,
+        int OriginalLength,
+        byte Compression);
+
+    /// <param name="Work">The in-flight compression, produced by <c>CompressChunk</c>.</param>
+    /// <param name="RawBuffer">The pooled read buffer to return once the chunk is written.</param>
+    private readonly record struct PendingChunk(Task<ChunkResult> Work, byte[] RawBuffer);
+
+    /// <param name="Work">The in-flight inflate, yielding the plaintext buffer.</param>
+    /// <param name="StoredBuffer">The pooled buffer holding the stored (compressed) chunk.</param>
+    /// <param name="OriginalLength">Uncompressed byte count to write and hash.</param>
+    /// <param name="PlainIsStored">True for raw chunks, where the plaintext is the stored buffer.</param>
+    private readonly record struct PendingInflate(
+        Task<byte[]> Work,
+        byte[] StoredBuffer,
+        int OriginalLength,
+        bool PlainIsStored);
 }
 
 /// <param name="Path">Archive-relative path.</param>
