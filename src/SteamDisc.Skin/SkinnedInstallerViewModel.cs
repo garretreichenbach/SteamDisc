@@ -37,6 +37,10 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     [ObservableProperty]
     private string _gameTitle = "Game";
 
+    /// <summary>Optional version label shown beside the title, e.g. "v1.2". Empty hides it.</summary>
+    [ObservableProperty]
+    private string _versionLabel = string.Empty;
+
     /// <summary>
     /// Which tool built and is running this disc, e.g. "SteamDisc v0.1.0" — shown in the
     /// installer's chrome. Defaults to the running application's own version.

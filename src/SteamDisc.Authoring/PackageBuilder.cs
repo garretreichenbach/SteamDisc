@@ -39,6 +39,9 @@ public sealed record PackageRequest(GameCandidate Game, string OutputDirectory, 
 
     /// <summary>Relative paths inside the game folder to leave out of the archive.</summary>
     public IReadOnlyCollection<string>? ExcludeRelativePaths { get; init; }
+
+    /// <summary>Optional version label for the game, shown on the installer, e.g. "v1.2".</summary>
+    public string? VersionLabel { get; init; }
 }
 
 /// <param name="DiscRoots">Staging folder for each disc, in order.</param>
@@ -212,6 +215,7 @@ public sealed class PackageBuilder
             AppId = game.AppId,
             InstallDir = game.InstallDir,
             BuildId = game.BuildId,
+            Version = string.IsNullOrWhiteSpace(request.VersionLabel) ? null : request.VersionLabel.Trim(),
             SizeOnDisk = archive.UncompressedBytes,
             FileCount = archive.FileCount,
             CreatedUtc = DateTimeOffset.UtcNow,

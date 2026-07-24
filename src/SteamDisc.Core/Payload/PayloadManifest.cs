@@ -34,6 +34,13 @@ public sealed class PayloadManifest
     [JsonPropertyName("buildId")]
     public long BuildId { get; set; }
 
+    /// <summary>
+    /// Optional human version label for the game, e.g. "v1.2" or "GOTY Edition". Display only —
+    /// it distinguishes discs of different releases and never affects the install itself.
+    /// </summary>
+    [JsonPropertyName("version")]
+    public string? Version { get; set; }
+
     /// <summary>Uncompressed size of the game folder, used for free-space checks and estimates.</summary>
     [JsonPropertyName("sizeOnDisk")]
     public long SizeOnDisk { get; set; }

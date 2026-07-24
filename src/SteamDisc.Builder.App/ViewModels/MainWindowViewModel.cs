@@ -119,6 +119,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(BuildCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
     private GameItem? _selectedGame;
 
     [ObservableProperty]
@@ -160,6 +161,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _writeHashes = true;
 
+    /// <summary>Paths excluded via the "Edit files" window, or null to pack the whole folder.</summary>
+    private IReadOnlyList<string>? _fileExclusions;
+
+    private long _excludedBytes;
+
+    /// <summary>One-line summary of the current file selection, shown next to the Edit files button.</summary>
+    [ObservableProperty]
+    private string _fileSelectionSummary = "All files included.";
+
     [ObservableProperty]
     private string? _runtimeExePath;
 
@@ -170,6 +180,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>The blurb shown on the installer, seeded from Steam but editable.</summary>
     [ObservableProperty]
     private string _description = string.Empty;
+
+    /// <summary>Optional game version label shown on the installer, e.g. "v1.2". Blank hides it.</summary>
+    [ObservableProperty]
+    private string _versionLabel = string.Empty;
 
     /// <summary>Whether to print the "may need updates" caution on the installer.</summary>
     [ObservableProperty]
@@ -206,6 +220,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(BurnCommand))]
     [NotifyCanExecuteChangedFor(nameof(TestInstallCommand))]
     [NotifyCanExecuteChangedFor(nameof(AutoFetchAllCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -279,6 +294,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnDescriptionChanged(string value) => RefreshPreview();
 
+    partial void OnVersionLabelChanged(string value) => RefreshPreview();
+
     partial void OnRuntimeExePathChanged(string? value) => UpdateRuntimeStatus();
 
     /// <summary>
@@ -314,6 +331,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedGameChanged(GameItem? value)
     {
+        // File selection is per-game; a selection made for the last game means nothing here.
+        ResetFileSelection();
+
+        // The version label is per-game too; don't carry one game's version onto the next.
+        VersionLabel = string.Empty;
+
         if (value is not null)
         {
             SuggestOutputFolder(value);
@@ -382,7 +405,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        var uncompressed = game.Candidate.ManifestSize;
+        // Excluded files come straight off the top before compression is even considered.
+        var uncompressed = Math.Max(0, game.Candidate.ManifestSize - _excludedBytes);
 
         // Deliberately pessimistic. Game data is largely pre-compressed already — a real build
         // measured 0.83 at Maximum — so an optimistic ratio promises a fit that only fails once
@@ -451,6 +475,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var tokens = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["title"] = title };
 
         Preview.GameTitle = title;
+        Preview.VersionLabel = VersionLabel.Trim();
         ThemeResources.Apply(Preview, definition, tokens);
 
         // Apply seeds Description from the theme; the Builder's own field takes precedence.
@@ -552,6 +577,45 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
+    private async Task EditFilesAsync()
+    {
+        if (SelectedGame is null)
+        {
+            return;
+        }
+
+        var result = await Storage.EditFileSelectionAsync(SelectedGame.Candidate, _fileExclusions);
+        if (result is null)
+        {
+            return; // Cancelled — keep whatever was chosen before.
+        }
+
+        if (result.Exclusions.Count == 0)
+        {
+            ResetFileSelection();
+        }
+        else
+        {
+            _fileExclusions = result.Exclusions;
+            _excludedBytes = result.ExcludedBytes;
+            FileSelectionSummary =
+                $"Excluding {result.ExcludedCount} item(s), {GameItem.FormatBytes(result.ExcludedBytes)}. " +
+                "A Steam 'verify integrity' may re-download them.";
+        }
+
+        UpdateEstimate();
+    }
+
+    private bool CanEditFiles => !IsBusy && SelectedGame is not null;
+
+    private void ResetFileSelection()
+    {
+        _fileExclusions = null;
+        _excludedBytes = 0;
+        FileSelectionSummary = "All files included.";
+    }
+
     [RelayCommand]
     private async Task LocateRuntimeAsync()
     {
@@ -595,6 +659,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Artwork = CollectArtwork(),
             RuntimeExecutablePath = string.IsNullOrWhiteSpace(RuntimeExePath) ? null : RuntimeExePath,
             WriteHashSidecar = WriteHashes,
+            ExcludeRelativePaths = _fileExclusions,
+            VersionLabel = string.IsNullOrWhiteSpace(VersionLabel) ? null : VersionLabel.Trim(),
         };
 
         var progress = new Progress<OperationProgress>(OnProgress);

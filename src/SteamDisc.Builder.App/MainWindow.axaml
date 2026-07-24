@@ -112,6 +112,10 @@
               </StackPanel>
             </Grid>
 
+            <TextBlock Text="Version label (optional)" Classes="label" Margin="0,4,0,0" />
+            <TextBox Text="{Binding VersionLabel}" MaxLength="40"
+                     Watermark="e.g. v1.2 or GOTY Edition — shown on the installer" />
+
             <TextBlock Text="Description (shown on the installer)" Classes="label" Margin="0,4,0,0" />
             <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap"
                      Height="74" Watermark="Fetched from Steam when you pick a game — edit freely…" />
@@ -126,6 +130,13 @@
             <StackPanel Spacing="3" Margin="0,4,0,0">
               <CheckBox Content="Write SHA-256 hash sidecar" IsChecked="{Binding WriteHashes}" />
             </StackPanel>
+
+            <TextBlock Text="Files to include" Classes="label" Margin="0,4,0,0" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+              <Button Grid.Column="0" Content="Edit files…" Command="{Binding EditFilesCommand}" />
+              <TextBlock Grid.Column="1" Text="{Binding FileSelectionSummary}" Classes="label"
+                         VerticalAlignment="Center" TextWrapping="Wrap" />
+            </Grid>
 
             <TextBlock Text="Runtime Setup.exe (stamped onto the disc)" Classes="label" Margin="0,4,0,0" />
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
