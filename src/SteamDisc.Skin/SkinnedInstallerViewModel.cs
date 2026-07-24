@@ -188,6 +188,14 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     [ObservableProperty]
     private string _verifyOptionText = "Verify game files after install";
 
+    /// <summary>Start the game as soon as the install finishes, for an unattended run. The Play
+    /// button on the completion screen is offered either way.</summary>
+    [ObservableProperty]
+    private bool _launchWhenFinished = true;
+
+    [ObservableProperty]
+    private string _launchOptionText = "Launch the game when finished";
+
     // --- Library choice ----------------------------------------------------
     // Libraries are represented as display strings so the skin stays decoupled from Steam types;
     // the front-end keeps the mapping back to the real library.
