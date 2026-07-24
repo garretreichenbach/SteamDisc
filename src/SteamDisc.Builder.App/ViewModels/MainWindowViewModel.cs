@@ -156,9 +156,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private ThemeOption? _selectedTheme;
 
     [ObservableProperty]
-    private bool _launchAfterInstall = true;
-
-    [ObservableProperty]
     private bool _writeHashes = true;
 
     [ObservableProperty]
