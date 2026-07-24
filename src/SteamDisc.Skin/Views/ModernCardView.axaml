@@ -69,6 +69,11 @@
                 <TextBlock Text="{Binding Description}" TextWrapping="Wrap" TextAlignment="Center"
                            FontSize="12.5" FontFamily="{Binding BodyFont}" Foreground="{Binding TextMutedBrush}"
                            IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Border IsVisible="{Binding UpdateNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        Background="#22F5B32B" CornerRadius="6" Padding="10,8">
+                  <TextBlock Text="{Binding UpdateNotice}" TextWrapping="Wrap" TextAlignment="Center"
+                             FontSize="12" Foreground="#F6D79A" />
+                </Border>
                 <StackPanel Spacing="8" IsVisible="{Binding ShowLibraryChooser}">
                   <TextBlock Text="Install to" FontSize="12" Foreground="{Binding TextMutedBrush}"
                              HorizontalAlignment="Center" />
@@ -138,5 +143,8 @@
         </Panel>
       </Grid>
     </Border>
+
+    <controls:SteamBadge Tint="{Binding TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                         Margin="0,20,24,0" Opacity="0.85" />
   </Grid>
 </UserControl>

@@ -297,9 +297,11 @@ public sealed class PackageBuilder
         var theme = request.Theme ?? BuiltInThemes.ValveRetail2011();
         BuiltInThemes.WriteThemeFolder(theme, Path.Combine(discRoot, "theme"), request.Artwork);
 
+        var hasRuntime = false;
         if (request.RuntimeExecutablePath is { Length: > 0 } runtime && File.Exists(runtime))
         {
             File.Copy(runtime, Path.Combine(discRoot, "Setup.exe"), overwrite: true);
+            hasRuntime = true;
         }
         else if (discNumber == 1)
         {
@@ -308,7 +310,11 @@ public sealed class PackageBuilder
                 "Publish SteamDisc.Runtime and pass its path to make the disc self-contained.");
         }
 
-        AutorunFile.Write(discRoot, manifest.Disc.Label ?? manifest.Title);
+        // Show the SteamDisc icon on the mounted disc by borrowing the one baked into Setup.exe.
+        AutorunFile.Write(
+            discRoot,
+            manifest.Disc.Label ?? manifest.Title,
+            iconPath: hasRuntime ? "Setup.exe" : null);
         manifest.Save(Path.Combine(discRoot, PayloadManifest.FileName));
     }
 }

@@ -101,6 +101,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RefreshPreview();
     }
 
+    /// <summary>The app version, e.g. "v0.1.0", for the header.</summary>
+    public static string Version { get; } =
+        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v
+            ? $"v{v.Major}.{v.Minor}.{v.Build}"
+            : "v0.1.0";
+
     /// <summary>Set by the window once it exists, before any picker is used.</summary>
     public StorageService Storage { get; private set; } = null!;
 
@@ -144,7 +150,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         new ThemeOption("classic", "Classic — retail splash"),
         new ThemeOption("modern", "Modern — cover card"),
-        new ThemeOption("compilation", "Compilation"),
     };
 
     [ObservableProperty]
@@ -165,6 +170,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>The blurb shown on the installer, seeded from Steam but editable.</summary>
     [ObservableProperty]
     private string _description = string.Empty;
+
+    /// <summary>Whether to print the "may need updates" caution on the installer.</summary>
+    [ObservableProperty]
+    private bool _showUpdateNotice;
+
+    [ObservableProperty]
+    private string _updateNoticeText = "Game may require updates via the Steam client after installing.";
 
     /// <summary>Approximate on-disc size for the current game, compression, and media.</summary>
     [ObservableProperty]
@@ -265,6 +277,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnDescriptionChanged(string value) => RefreshPreview();
 
+    partial void OnShowUpdateNoticeChanged(bool value) => RefreshPreview();
+
+    partial void OnUpdateNoticeTextChanged(string value) => RefreshPreview();
+
     partial void OnSelectedCompressionChanged(ArchiveCompression value) => UpdateEstimate();
 
     partial void OnSelectedMediumChanged(OpticalMedium value) => UpdateEstimate();
@@ -284,6 +300,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // Reset the blurb and pull the game's Steam description as a starting point.
             Description = string.Empty;
             _ = FetchDescriptionAsync();
+
+            // Default the update caution on for games the catalog flags as often-patched.
+            ShowUpdateNotice = value.Candidate.HasWarnings ||
+                               value.Candidate.Suitability == GameSuitability.Caveats;
         }
         else
         {
@@ -405,6 +425,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         // Apply seeds Description from the theme; the Builder's own field takes precedence.
         Preview.Description = Description;
+        Preview.UpdateNotice = ShowUpdateNotice ? UpdateNoticeText.Trim() : string.Empty;
         Preview.ShowStoreButton = CurrentAppId != 0;
         Preview.StoreUrl = CurrentAppId != 0 ? $"https://store.steampowered.com/app/{CurrentAppId}/" : null;
 
@@ -529,6 +550,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(Description))
         {
             theme.Strings[ThemeResources.GameDescriptionKey] = Description.Trim();
+        }
+
+        if (ShowUpdateNotice && !string.IsNullOrWhiteSpace(UpdateNoticeText))
+        {
+            theme.Strings[ThemeResources.UpdateNoticeKey] = UpdateNoticeText.Trim();
         }
 
         var request = new PackageRequest(SelectedGame.Candidate, OutputFolder, SelectedMedium)

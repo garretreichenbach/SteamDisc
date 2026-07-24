@@ -4,6 +4,7 @@
         x:Class="SteamDisc.Runtime.App.MainWindow"
         Width="900" Height="600" CanResize="False"
         WindowStartupLocation="CenterScreen"
+        Icon="/Assets/SteamDisc.ico"
         Title="SteamDisc Setup">
   <skin:SkinHost x:Name="Host" />
 </Window>

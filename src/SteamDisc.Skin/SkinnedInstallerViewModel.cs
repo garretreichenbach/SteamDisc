@@ -42,6 +42,10 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     [ObservableProperty]
     private string _description = string.Empty;
 
+    /// <summary>An optional caution (e.g. "may update via Steam after installing"). Empty hides it.</summary>
+    [ObservableProperty]
+    private string _updateNotice = string.Empty;
+
     // --- Artwork (null degrades to the theme's colours alone) --------------
     [ObservableProperty]
     private IImage? _backgroundImage;

@@ -7,6 +7,7 @@
         x:DataType="vm:MainWindowViewModel"
         Width="1240" Height="820" MinWidth="1080" MinHeight="680"
         WindowStartupLocation="CenterScreen"
+        Icon="/Assets/SteamDisc.ico"
         Title="SteamDisc — Author">
 
   <Window.Styles>
@@ -33,7 +34,11 @@
     <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="14">
 
-        <TextBlock Text="SteamDisc" FontSize="22" FontWeight="Bold" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="SteamDisc" FontSize="22" FontWeight="Bold" />
+          <TextBlock Text="{Binding Version}" FontSize="13" Opacity="0.5"
+                     VerticalAlignment="Bottom" Margin="0,0,0,4" />
+        </StackPanel>
         <TextBlock Text="Turn an installed game into a burnable, skinned disc." Classes="label" />
 
         <!-- 1 · Choose a game -->
@@ -112,6 +117,11 @@
                      Height="74" Watermark="Fetched from Steam when you pick a game — edit freely…" />
             <Button Content="Re-fetch from Steam" HorizontalAlignment="Left" Padding="10,4" FontSize="12"
                     Command="{Binding RefetchDescriptionCommand}" />
+
+            <CheckBox Content="Show update disclaimer on the installer" IsChecked="{Binding ShowUpdateNotice}"
+                      Margin="0,6,0,0" />
+            <TextBox Text="{Binding UpdateNoticeText}" IsEnabled="{Binding ShowUpdateNotice}"
+                     TextWrapping="Wrap" AcceptsReturn="False" FontSize="12" />
 
             <StackPanel Spacing="3" Margin="0,4,0,0">
               <CheckBox Content="Verify files locally after install" IsChecked="{Binding ValidateAfterInstall}" />

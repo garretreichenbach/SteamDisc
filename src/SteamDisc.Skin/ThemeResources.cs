@@ -39,6 +39,9 @@ public static class ThemeResources
     /// </summary>
     public const string GameDescriptionKey = "gameDescription";
 
+    /// <summary>Theme-strings key for the optional "may need updates" caution.</summary>
+    public const string UpdateNoticeKey = "updateNotice";
+
     private static readonly ThemeColor DefaultAccent = new(0xFF, 0x66, 0x00, 0xFF);
     private static readonly ThemeColor DefaultBackground = new(0x10, 0x10, 0x14, 0xFF);
     private static readonly ThemeColor DefaultSurface = new(0x1B, 0x1B, 0x22, 0xFF);
@@ -81,6 +84,10 @@ public static class ThemeResources
         // so it is read directly rather than through the defaults-backed lookup.
         viewModel.Description = definition.Strings.TryGetValue(GameDescriptionKey, out var description)
             ? description
+            : string.Empty;
+
+        viewModel.UpdateNotice = definition.Strings.TryGetValue(UpdateNoticeKey, out var notice)
+            ? notice
             : string.Empty;
 
         viewModel.WelcomeBody = Localise(definition, ThemeStrings.WelcomeBody, tokens);

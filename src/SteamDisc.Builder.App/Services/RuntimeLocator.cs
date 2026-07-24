@@ -8,7 +8,17 @@ public static class RuntimeLocator
 {
     public static string? Locate()
     {
-        var root = FindRepoRoot(new DirectoryInfo(AppContext.BaseDirectory));
+        // Packaged layout: Setup.exe sits beside the authoring app (or in an Installer subfolder).
+        var baseDir = AppContext.BaseDirectory;
+        foreach (var beside in new[] { Path.Combine(baseDir, "Setup.exe"), Path.Combine(baseDir, "Installer", "Setup.exe") })
+        {
+            if (File.Exists(beside))
+            {
+                return beside;
+            }
+        }
+
+        var root = FindRepoRoot(new DirectoryInfo(baseDir));
         if (root is null)
         {
             return null;

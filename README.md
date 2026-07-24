@@ -354,4 +354,5 @@ dotnet test
 
 ## Licence
 
-Not yet chosen.
+[MIT](LICENSE). A personal-archival tool for games you own; it does not acquire games, bypass
+anything, or replace Steam.

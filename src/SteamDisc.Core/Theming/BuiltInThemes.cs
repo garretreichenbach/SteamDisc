@@ -26,7 +26,7 @@ public static class BuiltInThemes
         {
             [ThemeStrings.InstallButton] = "Install",
             [ThemeStrings.PlayButton] = "Play",
-            [ThemeStrings.WelcomeBody] = "Insert. Install. Play. {title} will be added to your Steam library.",
+            [ThemeStrings.WelcomeBody] = "{title} will be added to your Steam library.",
         },
     };
 

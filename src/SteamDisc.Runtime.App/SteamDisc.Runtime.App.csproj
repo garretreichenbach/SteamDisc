@@ -5,7 +5,12 @@
     <AssemblyName>Setup</AssemblyName>
     <RootNamespace>SteamDisc.Runtime.App</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>..\..\assets\SteamDisc.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="..\..\assets\SteamDisc.ico" Link="Assets\SteamDisc.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.0" />

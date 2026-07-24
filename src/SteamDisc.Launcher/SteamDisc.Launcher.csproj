@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <AssemblyName>SteamDisc.Author</AssemblyName>
-    <RootNamespace>SteamDisc.Builder.App</RootNamespace>
+    <AssemblyName>SteamDisc</AssemblyName>
+    <RootNamespace>SteamDisc.Launcher</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationIcon>..\..\assets\SteamDisc.ico</ApplicationIcon>
   </PropertyGroup>
@@ -17,14 +17,10 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.0" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SteamDisc.Core\SteamDisc.Core.csproj" />
-    <ProjectReference Include="..\SteamDisc.Art\SteamDisc.Art.csproj" />
-    <ProjectReference Include="..\SteamDisc.Authoring\SteamDisc.Authoring.csproj" />
-    <ProjectReference Include="..\SteamDisc.Imaging\SteamDisc.Imaging.csproj" />
+    <!-- Referenced only for the shared Steam badge; no engine dependencies. -->
     <ProjectReference Include="..\SteamDisc.Skin\SteamDisc.Skin.csproj" />
   </ItemGroup>
 
