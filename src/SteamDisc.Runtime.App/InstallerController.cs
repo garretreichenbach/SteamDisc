@@ -233,6 +233,29 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             Warnings.Add(warning);
         }
 
+        // The engine only looks in the target library. Steam tracks one install location per
+        // app, so a copy sitting in a *different* library matters just as much - say so plainly
+        // and relabel the action rather than quietly making a second copy.
+        var installed = _steam.GetInstalledApps().FirstOrDefault(a => a.AppId == _manifest.AppId);
+        if (installed is not null)
+        {
+            var elsewhere = !string.Equals(
+                installed.Library.Path, library.Path, StringComparison.OrdinalIgnoreCase);
+
+            Warnings.Insert(0, elsewhere
+                ? $"{installed.Manifest.Name} is already installed in another library " +
+                  $"({installed.InstallPath}). Steam keeps one location per game — install to that " +
+                  "library, or uninstall it first."
+                : $"{installed.Manifest.Name} is already installed here ({installed.InstallPath}). " +
+                  "Installing will overwrite it.");
+
+            PrimaryButtonText = "Reinstall";
+        }
+        else
+        {
+            PrimaryButtonText = _theme.String(ThemeStrings.InstallButton, _tokens);
+        }
+
         _canProceed = preflight.CanProceed;
         if (!preflight.CanProceed)
         {
