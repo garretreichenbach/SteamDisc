@@ -124,7 +124,6 @@
                      TextWrapping="Wrap" AcceptsReturn="False" FontSize="12" />
 
             <StackPanel Spacing="3" Margin="0,4,0,0">
-              <CheckBox Content="Launch the game after install" IsChecked="{Binding LaunchAfterInstall}" />
               <CheckBox Content="Write SHA-256 hash sidecar" IsChecked="{Binding WriteHashes}" />
             </StackPanel>
 
