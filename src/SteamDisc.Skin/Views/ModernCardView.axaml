@@ -102,8 +102,12 @@
                   <ComboBox ItemsSource="{Binding LibraryOptions}" SelectedItem="{Binding SelectedLibraryOption}"
                             HorizontalAlignment="Stretch" />
                 </StackPanel>
-                <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"
-                          Foreground="{Binding TextBrush}" FontSize="12" HorizontalAlignment="Center" />
+                <StackPanel Spacing="2" HorizontalAlignment="Center">
+                  <CheckBox Content="{Binding LaunchOptionText}" IsChecked="{Binding LaunchWhenFinished}"
+                            Foreground="{Binding TextBrush}" FontSize="12" />
+                  <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"
+                            Foreground="{Binding TextBrush}" FontSize="12" />
+                </StackPanel>
               </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
