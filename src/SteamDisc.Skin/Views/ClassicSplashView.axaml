@@ -111,8 +111,12 @@
             <ComboBox ItemsSource="{Binding LibraryOptions}" SelectedItem="{Binding SelectedLibraryOption}"
                       MinWidth="320" />
           </StackPanel>
-          <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"
-                    Foreground="{Binding TextBrush}" Margin="0,2,0,0" />
+          <StackPanel Spacing="1" Margin="0,2,0,0">
+            <CheckBox Content="{Binding LaunchOptionText}" IsChecked="{Binding LaunchWhenFinished}"
+                      Foreground="{Binding TextBrush}" />
+            <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"
+                      Foreground="{Binding TextBrush}" />
+          </StackPanel>
           <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,6,0,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="sys:String">
