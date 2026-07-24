@@ -93,8 +93,9 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             StoreUrl = $"https://store.steampowered.com/app/{_manifest.AppId}/";
             ShowStoreButton = _manifest.AppId != 0;
 
-            // The disc carries a default; the person installing gets the final say.
+            // The disc carries defaults; the person installing gets the final say on both.
             VerifyAfterInstall = _manifest.PostInstall.Validate;
+            LaunchWhenFinished = _manifest.PostInstall.Launch;
             _tokens["title"] = _manifest.Title;
             _tokens["disc"] = _manifest.Disc.Number.ToString(CultureInfo.InvariantCulture);
             _tokens["discCount"] = _manifest.Disc.Of.ToString(CultureInfo.InvariantCulture);
