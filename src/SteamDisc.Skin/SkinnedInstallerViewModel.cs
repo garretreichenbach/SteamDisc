@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace SteamDisc.Skin;
 
@@ -34,6 +36,13 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     // --- Identity and copy -------------------------------------------------
     [ObservableProperty]
     private string _gameTitle = "Game";
+
+    /// <summary>
+    /// Which tool built and is running this disc, e.g. "SteamDisc v0.1.0" — shown in the
+    /// installer's chrome. Defaults to the running application's own version.
+    /// </summary>
+    [ObservableProperty]
+    private string _productLabel = BuildProductLabel();
 
     [ObservableProperty]
     private string _welcomeBody = string.Empty;
@@ -176,6 +185,46 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
 
     /// <summary>Non-fatal problems surfaced before or during the install.</summary>
     public ObservableCollection<string> Warnings { get; } = new();
+
+    /// <summary>Where the SteamDisc label in the installer chrome points.</summary>
+    public const string ProjectUrl = "https://github.com/garretreichenbach/SteamDisc";
+
+    /// <summary>Where the Steam mark in the installer chrome points.</summary>
+    public const string SteamUrl = "https://store.steampowered.com/";
+
+    protected SkinnedInstallerViewModel()
+    {
+        OpenProjectCommand = new RelayCommand(() => OpenUrl(ProjectUrl));
+        OpenSteamCommand = new RelayCommand(() => OpenUrl(SteamUrl));
+    }
+
+    /// <summary>Opens the SteamDisc project page.</summary>
+    public ICommand OpenProjectCommand { get; }
+
+    /// <summary>Opens Steam's own site.</summary>
+    public ICommand OpenSteamCommand { get; }
+
+    /// <summary>Hands a URL to the system browser. Failing to open one is never worth a crash.</summary>
+    protected static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException
+                                       or System.IO.FileNotFoundException)
+        {
+            // No browser, or the shell refused it — the installer carries on regardless.
+        }
+    }
+
+    private static string BuildProductLabel()
+    {
+        var version = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+        return version is null
+            ? "SteamDisc"
+            : $"SteamDisc v{version.Major}.{version.Minor}.{version.Build}";
+    }
 
     // --- Install options (chosen by whoever is installing, not by the author) ----------
     /// <summary>

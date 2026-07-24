@@ -30,11 +30,17 @@ public static class RuntimeLocator
             return null;
         }
 
-        // Prefer a published, single-file build; then Release; then whatever is newest.
-        return Directory.EnumerateFiles(appBin, "Setup.exe", SearchOption.AllDirectories)
-            .OrderByDescending(p => p.Contains("publish", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(p => p.Contains("Release", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(File.GetLastWriteTimeUtc)
+        // A disc's Setup.exe has to run on a machine with no .NET, and only the publish output is
+        // self-contained — so published builds win over plain build output. Within them the
+        // newest wins: ranking every publish above every build let one stale publish keep winning
+        // forever and get stamped onto every disc, while the Builder's preview showed current code.
+        var candidates = Directory.EnumerateFiles(appBin, "Setup.exe", SearchOption.AllDirectories).ToList();
+        var published = candidates
+            .Where(p => p.Contains("publish", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return (published.Count > 0 ? published : candidates)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
     }
 

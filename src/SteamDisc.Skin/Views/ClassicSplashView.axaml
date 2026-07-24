@@ -7,61 +7,16 @@
              x:DataType="skin:SkinnedInstallerViewModel">
 
   <UserControl.Resources>
-    <!-- Corner radius reused by the action buttons. -->
-    <CornerRadius x:Key="ButtonRadius">4</CornerRadius>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://SteamDisc.Skin/Themes/Buttons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </UserControl.Resources>
 
-  <UserControl.Styles>
-    <!--
-      The normal fill goes on the Button so the theme's template binding carries it. Hover and
-      pressed then swap in a shaded accent on the template part: a plain brush swap, with the
-      theme's transitions switched off. Animating opacity here instead makes the theme and this
-      style re-assert the background against each other every frame, which reads as a flicker.
-    -->
-    <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{Binding AccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Padding" Value="26,12" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{Binding AccentHoverBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-    <Style Selector="Button.primary:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="{Binding AccentPressedBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-
-    <Style Selector="Button.secondary">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{Binding TextBrush}" />
-      <Setter Property="BorderBrush" Value="{Binding TextMutedBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="22,12" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.secondary:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#26FFFFFF" />
-      <Setter Property="Foreground" Value="{Binding TextBrush}" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-    <Style Selector="Button.secondary:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="#14FFFFFF" />
-      <Setter Property="Foreground" Value="{Binding TextBrush}" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-  </UserControl.Styles>
-
-  <!-- Clipped to a rounded rect so the full-bleed art follows the corners too. -->
-  <Border CornerRadius="10" ClipToBounds="True" Background="{Binding BackgroundBrush}">
+  <!-- Bottom corners only: Windows already rounds the window itself, and rounding the top too
+       just clips the title bar awkwardly. -->
+  <Border CornerRadius="0,0,10,10" ClipToBounds="True" Background="{Binding BackgroundBrush}">
     <Grid>
     <!-- Layer 1: full-bleed key art. Null source simply shows nothing. -->
     <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill" />
@@ -69,8 +24,23 @@
     <!-- Layer 2: a wash so text stays legible over any art. -->
     <Border Background="{Binding ScrimBrush}" />
 
-    <!-- Layer 3: content. -->
-    <Grid Margin="44" RowDefinitions="Auto,*">
+    <!-- Layer 3: title bar, in Steam's blue-grey, so the mark has something to sit on. -->
+    <Border VerticalAlignment="Top" Height="42" Background="#2A475E">
+      <Grid Margin="12,0" ColumnDefinitions="Auto,*,Auto">
+        <Button Grid.Column="0" Theme="{StaticResource SkinLinkButton}" Background="Transparent"
+                Foreground="#C7D5E0" FontSize="12.5" Padding="6,4" VerticalAlignment="Center"
+                Content="{Binding ProductLabel}" Command="{Binding OpenProjectCommand}"
+                ToolTip.Tip="Open the SteamDisc project page" />
+        <Button Grid.Column="2" Theme="{StaticResource SkinLinkButton}" Background="Transparent"
+                Padding="6,4" VerticalAlignment="Center" Command="{Binding OpenSteamCommand}"
+                ToolTip.Tip="Open Steam">
+          <controls:SteamBadge Tint="#C7D5E0" GlyphSize="18" />
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Layer 4: content, cleared of the bar above. -->
+    <Grid Margin="44,66,44,44" RowDefinitions="Auto,*">
 
       <!-- Masthead: the title logo, or the title as text when there is no logo. -->
       <Panel Grid.Row="0" HorizontalAlignment="Left">
@@ -86,7 +56,10 @@
 
       <!-- WELCOME -->
       <Grid Grid.Row="1" IsVisible="{Binding IsWelcome}" RowDefinitions="*,Auto">
-        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+        <!-- Scrolls rather than overflowing: a long blurb plus warnings would otherwise run
+             straight over the buttons below. -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+        <StackPanel VerticalAlignment="Bottom" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
           <TextBlock Text="{Binding WelcomeBody}" TextWrapping="Wrap" FontSize="18"
                      FontFamily="{Binding BodyFont}" Foreground="{Binding TextBrush}" />
           <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto" HorizontalAlignment="Left"
@@ -127,18 +100,21 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </StackPanel>
+        </ScrollViewer>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,24,0,0" HorizontalAlignment="Left">
-          <Button Classes="primary" Content="{Binding PrimaryButtonText}"
+          <Button Theme="{StaticResource SkinPrimaryButton}" Background="{Binding AccentBrush}" Foreground="White" Content="{Binding PrimaryButtonText}"
                   Command="{Binding PrimaryCommand}" IsEnabled="{Binding IsPrimaryEnabled}" />
-          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
-          <Button Classes="secondary" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+          <Button Theme="{StaticResource SkinQuietButton}" Background="Transparent" Foreground="{Binding TextBrush}" BorderBrush="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+          <Button Theme="{StaticResource SkinQuietButton}" Background="Transparent" Foreground="{Binding TextBrush}" BorderBrush="{Binding TextMutedBrush}" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
                   IsVisible="{Binding ShowStoreButton}" />
         </StackPanel>
       </Grid>
 
       <!-- INSTALLING -->
       <Grid Grid.Row="1" IsVisible="{Binding IsInstalling}" RowDefinitions="*,Auto">
-        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="720" HorizontalAlignment="Left">
+        <!-- Fixed width, not MaxWidth: a left-aligned panel sizes to its widest child, so the
+             changing file name would otherwise stretch and shrink the progress bar with it. -->
+        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" Width="720" HorizontalAlignment="Left">
           <TextBlock Text="{Binding PhaseText}" FontSize="22" FontWeight="SemiBold"
                      FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}" />
           <TextBlock Text="{Binding StatusLine}" FontSize="13" Foreground="{Binding TextMutedBrush}"
@@ -152,7 +128,7 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,24,0,0" HorizontalAlignment="Left">
-          <Button Classes="secondary" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
+          <Button Theme="{StaticResource SkinQuietButton}" Background="Transparent" Foreground="{Binding TextBrush}" BorderBrush="{Binding TextMutedBrush}" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
         </StackPanel>
       </Grid>
 
@@ -172,8 +148,8 @@
           </ItemsControl>
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,24,0,0" HorizontalAlignment="Left">
-          <Button Classes="primary" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
-          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+          <Button Theme="{StaticResource SkinPrimaryButton}" Background="{Binding AccentBrush}" Foreground="White" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
+          <Button Theme="{StaticResource SkinQuietButton}" Background="Transparent" Foreground="{Binding TextBrush}" BorderBrush="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
         </StackPanel>
       </Grid>
 
@@ -186,14 +162,12 @@
                      FontFamily="{Binding BodyFont}" Foreground="{Binding TextBrush}" />
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,24,0,0" HorizontalAlignment="Left">
-          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+          <Button Theme="{StaticResource SkinQuietButton}" Background="Transparent" Foreground="{Binding TextBrush}" BorderBrush="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
         </StackPanel>
       </Grid>
 
     </Grid>
 
-    <controls:SteamBadge Tint="{Binding TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                         Margin="0,30,44,0" Opacity="0.85" />
     </Grid>
   </Border>
 </UserControl>

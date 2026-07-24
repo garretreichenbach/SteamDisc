@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -98,6 +99,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ArtSlots = new ObservableCollection<ArtSlotViewModel> { Background, Logo, Cover, Icon };
 
         _runtimeExePath = RuntimeLocator.Locate();
+        UpdateRuntimeStatus();
         RefreshPreview();
     }
 
@@ -161,6 +163,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string? _runtimeExePath;
 
+    /// <summary>When the stamped runtime was built, and whether it looks stale.</summary>
+    [ObservableProperty]
+    private string _runtimeStatusText = string.Empty;
+
     /// <summary>The blurb shown on the installer, seeded from Steam but editable.</summary>
     [ObservableProperty]
     private string _description = string.Empty;
@@ -198,11 +204,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(BuildCommand))]
     [NotifyCanExecuteChangedFor(nameof(BuildIsoCommand))]
     [NotifyCanExecuteChangedFor(nameof(BurnCommand))]
+    [NotifyCanExecuteChangedFor(nameof(TestInstallCommand))]
     [NotifyCanExecuteChangedFor(nameof(AutoFetchAllCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(BuildIsoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(TestInstallCommand))]
     private bool _canBuildIso;
 
     [ObservableProperty]
@@ -270,6 +278,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedThemeChanged(ThemeOption? value) => RefreshPreview();
 
     partial void OnDescriptionChanged(string value) => RefreshPreview();
+
+    partial void OnRuntimeExePathChanged(string? value) => UpdateRuntimeStatus();
+
+    /// <summary>
+    /// Reports how old the runtime being stamped onto discs is. A stale Setup.exe is otherwise
+    /// invisible: the preview renders current code while the disc carries an older installer.
+    /// </summary>
+    private void UpdateRuntimeStatus()
+    {
+        if (string.IsNullOrWhiteSpace(RuntimeExePath) || !File.Exists(RuntimeExePath))
+        {
+            RuntimeStatusText = string.Empty;
+            return;
+        }
+
+        var built = File.GetLastWriteTime(RuntimeExePath);
+        var thisTool = Environment.ProcessPath is { Length: > 0 } self && File.Exists(self)
+            ? File.GetLastWriteTime(self)
+            : built;
+
+        RuntimeStatusText = built < thisTool.AddMinutes(-5)
+            ? $"⚠ Built {built:g} — older than this tool. Re-publish SteamDisc.Runtime.App, " +
+              "then rebuild, or the disc will carry an out-of-date installer."
+            : $"Built {built:g}";
+    }
 
     partial void OnShowUpdateNoticeChanged(bool value) => RefreshPreview();
 
@@ -351,30 +384,33 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         var uncompressed = game.Candidate.ManifestSize;
 
-        // Heuristic only — game data is often already packed, so the real ratio varies widely.
-        // The actual figure is reported after the build; this is just to inform the choice.
+        // Deliberately pessimistic. Game data is largely pre-compressed already — a real build
+        // measured 0.83 at Maximum — so an optimistic ratio promises a fit that only fails once
+        // the disc is burned. Predicting one disc too many is much the cheaper mistake.
         var ratio = SelectedCompression switch
         {
             ArchiveCompression.Store => 1.00,
-            ArchiveCompression.Fast => 0.85,
-            ArchiveCompression.Balanced => 0.78,
-            ArchiveCompression.Maximum => 0.70,
-            _ => 0.85,
+            ArchiveCompression.Fast => 0.95,
+            ArchiveCompression.Balanced => 0.90,
+            ArchiveCompression.Maximum => 0.85,
+            _ => 0.95,
         };
 
         var estimated = (long)(uncompressed * ratio);
-        string fit;
-        if (SelectedMedium.CapacityBytes == long.MaxValue)
-        {
-            fit = "single image";
-        }
-        else
-        {
-            var discs = (int)Math.Ceiling((double)estimated / SelectedMedium.CapacityBytes);
-            fit = discs <= 1 ? $"fits {SelectedMedium.Name}" : $"{discs} × {SelectedMedium.Name}";
-        }
 
-        EstimateText = $"≈ {GameItem.FormatBytes(estimated)} on disc (est. from {GameItem.FormatBytes(uncompressed)}) · {fit}";
+        // Ask the planner rather than dividing by raw capacity: it reserves the same per-disc
+        // overhead the build will (runtime, theme, ISO structures), so the two agree.
+        var discs = DiscSpanPlanner.EstimateDiscCount(estimated, SelectedMedium);
+        var fit = SelectedMedium.CapacityBytes == long.MaxValue
+            ? "single image"
+            : discs <= 1
+                ? $"should fit one {SelectedMedium.Name}"
+                : $"about {discs} × {SelectedMedium.Name}";
+
+        // Decimal units here, so the figure is directly comparable to the media capacity.
+        EstimateText =
+            $"≈ {FormatDecimalBytes(estimated)} on disc (rough estimate from " +
+            $"{FormatDecimalBytes(uncompressed)}) · {fit}";
     }
 
     private void ApplyFilter()
@@ -626,6 +662,55 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool CanMakeIso => !IsBusy && CanBuildIso;
 
+    /// <summary>
+    /// Runs the disc's own Setup.exe against the staging folder, so the skin, preflight and
+    /// install can be checked before anything is burned to a coaster.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanTestInstall))]
+    private void TestInstall()
+    {
+        if (_lastResult is null)
+        {
+            return;
+        }
+
+        var discRoot = _lastResult.DiscRoots[0];
+        var setup = Path.Combine(discRoot, "Setup.exe");
+
+        if (!File.Exists(setup))
+        {
+            if (string.IsNullOrWhiteSpace(RuntimeExePath) || !File.Exists(RuntimeExePath))
+            {
+                StatusText = "This disc has no Setup.exe. Publish SteamDisc.Runtime.App and locate it first.";
+                return;
+            }
+
+            setup = RuntimeExePath;
+        }
+
+        try
+        {
+            var info = new ProcessStartInfo(setup)
+            {
+                UseShellExecute = false,
+                WorkingDirectory = discRoot,
+            };
+            info.ArgumentList.Add(discRoot);
+            Process.Start(info);
+
+            StatusText =
+                "Launched the disc installer against:" + Environment.NewLine +
+                "  " + discRoot + Environment.NewLine + Environment.NewLine +
+                "This installs for real — it is the same Setup.exe the burned disc will carry.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Could not start the installer: " + ex.Message;
+        }
+    }
+
+    private bool CanTestInstall => !IsBusy && CanBuildIso;
+
     [RelayCommand(CanExecute = nameof(CanStartBurn))]
     private async Task BurnAsync()
     {
@@ -759,6 +844,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
         lines.Add(string.Empty);
         lines.Add("Ready to build an ISO.");
         return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// Formats in decimal GB, the way optical media are labelled — so "5.2 GB" against a
+    /// "4.7 GB" disc reads correctly. Elsewhere sizes use the binary units Explorer shows.
+    /// </summary>
+    private static string FormatDecimalBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1000 && unit < units.Length - 1)
+        {
+            value /= 1000;
+            unit++;
+        }
+
+        return value.ToString(value >= 100 ? "F0" : "F1", CultureInfo.InvariantCulture) + " " + units[unit];
     }
 
     private static string FormatDuration(TimeSpan duration) => duration.TotalHours >= 1

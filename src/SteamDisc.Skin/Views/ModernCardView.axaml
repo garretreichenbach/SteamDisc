@@ -5,55 +5,24 @@
              x:Class="SteamDisc.Skin.Views.ModernCardView"
              x:DataType="skin:SkinnedInstallerViewModel">
 
-  <UserControl.Styles>
-    <!--
-      The normal fill goes on the Button so the theme's template binding carries it. Hover and
-      pressed swap in a shaded accent on the template part, with the theme's transitions off -
-      animating opacity here instead makes the two styles fight every frame and flicker.
-    -->
-    <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{Binding AccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Padding" Value="30,11" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{Binding AccentHoverBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-    <Style Selector="Button.primary:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="{Binding AccentPressedBrush}" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
+  <UserControl.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://SteamDisc.Skin/Themes/Buttons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </UserControl.Resources>
 
-    <Style Selector="Button.link">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{Binding TextMutedBrush}" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="8,5" />
+  <UserControl.Styles>
+    <!-- Layout only. Colour and state live in the button control themes, so nothing here
+         competes with them for the background. -->
+    <Style Selector="Button">
       <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Button.link:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#22FFFFFF" />
-      <Setter Property="Foreground" Value="{Binding TextBrush}" />
-      <Setter Property="Transitions" Value="{x:Null}" />
-    </Style>
-    <Style Selector="Button.link:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="#12FFFFFF" />
-      <Setter Property="Foreground" Value="{Binding TextBrush}" />
-      <Setter Property="Transitions" Value="{x:Null}" />
     </Style>
   </UserControl.Styles>
 
-  <!-- Clipped to a rounded rect so the background wash follows the corners too. -->
-  <Border CornerRadius="10" ClipToBounds="True" Background="{Binding BackgroundBrush}">
+  <!-- Bottom corners only: Windows already rounds the window itself. -->
+  <Border CornerRadius="0,0,10,10" ClipToBounds="True" Background="{Binding BackgroundBrush}">
     <Grid>
     <!-- A dim wash of the background art, if any, for depth. -->
     <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill" Opacity="0.25" />
@@ -113,11 +82,11 @@
               </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
-              <Button Classes="primary" Content="{Binding PrimaryButtonText}"
+              <Button Theme="{StaticResource SkinPrimaryButton}" Background="{Binding AccentBrush}" Foreground="White" Content="{Binding PrimaryButtonText}"
                       Command="{Binding PrimaryCommand}" IsEnabled="{Binding IsPrimaryEnabled}" />
-              <Button Classes="link" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+              <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
                       IsVisible="{Binding ShowStoreButton}" />
-              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+              <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
             </StackPanel>
           </Grid>
 
@@ -134,7 +103,7 @@
                        TextTrimming="CharacterEllipsis" Foreground="{Binding TextMutedBrush}" />
             <TextBlock Text="{Binding EtaText}" FontSize="12" TextAlignment="Center"
                        Foreground="{Binding TextMutedBrush}" />
-            <Button Classes="link" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
+            <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
           </StackPanel>
 
           <!-- COMPLETE -->
@@ -148,10 +117,10 @@
               </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
-              <Button Classes="primary" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
-              <Button Classes="link" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+              <Button Theme="{StaticResource SkinPrimaryButton}" Background="{Binding AccentBrush}" Foreground="White" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
+              <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
                       IsVisible="{Binding ShowStoreButton}" />
-              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+              <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
             </StackPanel>
           </Grid>
 
@@ -166,7 +135,7 @@
               </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Margin="0,14,0,0">
-              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+              <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Foreground="{Binding TextMutedBrush}" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
             </StackPanel>
           </Grid>
 
@@ -174,8 +143,16 @@
       </Grid>
     </Border>
 
-    <controls:SteamBadge Tint="{Binding TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                         Margin="0,20,24,0" Opacity="0.85" />
+    <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" FontSize="12"
+            Foreground="{Binding TextMutedBrush}" Opacity="0.85" Padding="6,4"
+            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="18,16,0,0"
+            Content="{Binding ProductLabel}" Command="{Binding OpenProjectCommand}"
+            ToolTip.Tip="Open the SteamDisc project page" />
+    <Button Theme="{StaticResource SkinLinkButton}" Background="Transparent" Opacity="0.85" Padding="6,4"
+            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,18,0"
+            Command="{Binding OpenSteamCommand}" ToolTip.Tip="Open Steam">
+      <controls:SteamBadge Tint="{Binding TextMutedBrush}" GlyphSize="18" />
+    </Button>
     </Grid>
   </Border>
 </UserControl>

@@ -96,7 +96,7 @@
               </StackPanel>
             </Grid>
 
-            <TextBlock Text="{Binding EstimateText}" FontSize="12" Foreground="#8FA0BF"
+            <TextBlock Text="{Binding EstimateText}" FontSize="12" Foreground="#8FA0BF" TextWrapping="Wrap"
                        IsVisible="{Binding EstimateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
             <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
@@ -135,6 +135,9 @@
             <TextBlock Classes="label" Foreground="#F5B32B"
                        Text="No runtime found — the disc will have no Setup.exe until you publish one."
                        IsVisible="{Binding RuntimeExePath, Converter={x:Static ObjectConverters.IsNull}}" />
+            <TextBlock Classes="label" Foreground="#8FA0BF" TextWrapping="Wrap"
+                       Text="{Binding RuntimeStatusText}"
+                       IsVisible="{Binding RuntimeStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
         </Border>
 
@@ -186,7 +189,7 @@
           <TextBlock Grid.Row="0" Text="Live preview — how the disc's installer will look" Classes="h2" />
           <Border Grid.Row="1" CornerRadius="6" ClipToBounds="True" Background="#0A0A0C">
             <Viewbox Stretch="Uniform" Margin="8">
-              <skin:SkinHost Width="900" Height="600"
+              <skin:SkinHost Width="900" Height="700"
                              Layout="{Binding PreviewLayout}" Installer="{Binding Preview}" />
             </Viewbox>
           </Border>
@@ -198,6 +201,8 @@
           <StackPanel Orientation="Horizontal" Spacing="10">
             <Button Content="Build disc" Command="{Binding BuildCommand}"
                     FontWeight="SemiBold" Padding="20,10" />
+            <Button Content="Test install" Command="{Binding TestInstallCommand}" Padding="20,10"
+                    ToolTip.Tip="Run the disc's own Setup.exe against the staging folder before burning." />
             <Button Content="Build ISO" Command="{Binding BuildIsoCommand}" Padding="20,10" />
             <Button Content="Burn…" Command="{Binding BurnCommand}" Padding="20,10" />
           </StackPanel>
