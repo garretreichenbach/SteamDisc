@@ -46,9 +46,15 @@
           </Panel>
         </Border>
 
-        <TextBlock Grid.Row="1" Text="{Binding GameTitle}" FontSize="20" FontWeight="Bold" TextAlignment="Center"
-                   FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}" Margin="0,14,0,0"
-                   HorizontalAlignment="Center" TextWrapping="Wrap" />
+        <StackPanel Grid.Row="1" Margin="0,14,0,0" HorizontalAlignment="Center" Spacing="2">
+          <TextBlock Text="{Binding GameTitle}" FontSize="20" FontWeight="Bold" TextAlignment="Center"
+                     FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}"
+                     HorizontalAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding VersionLabel}" FontSize="13" TextAlignment="Center"
+                     FontFamily="{Binding BodyFont}" Foreground="{Binding TextMutedBrush}"
+                     HorizontalAlignment="Center"
+                     IsVisible="{Binding VersionLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
 
         <!-- Stage area: a scrolling body over pinned actions, so buttons always show. -->
         <Panel Grid.Row="2" Margin="0,12,0,0">

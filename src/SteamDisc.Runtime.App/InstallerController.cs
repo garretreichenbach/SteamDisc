@@ -90,6 +90,7 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             }
 
             GameTitle = _manifest.Title;
+            VersionLabel = _manifest.Version ?? string.Empty;
             StoreUrl = $"https://store.steampowered.com/app/{_manifest.AppId}/";
             ShowStoreButton = _manifest.AppId != 0;
 
@@ -97,6 +98,7 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             VerifyAfterInstall = _manifest.PostInstall.Validate;
             LaunchWhenFinished = _manifest.PostInstall.Launch;
             _tokens["title"] = _manifest.Title;
+            _tokens["version"] = _manifest.Version ?? string.Empty;
             _tokens["disc"] = _manifest.Disc.Number.ToString(CultureInfo.InvariantCulture);
             _tokens["discCount"] = _manifest.Disc.Of.ToString(CultureInfo.InvariantCulture);
 

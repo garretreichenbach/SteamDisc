@@ -2,6 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using SteamDisc.Authoring;
+using SteamDisc.Builder.App.ViewModels;
 
 namespace SteamDisc.Builder.App.Services;
 
@@ -54,6 +56,23 @@ public sealed class StorageService
         });
 
         return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
+
+    /// <summary>
+    /// Opens the file-selection tree for a game and returns the result, or null if the user
+    /// cancelled. The folder is walked off the UI thread so a large game does not freeze the app.
+    /// </summary>
+    public async Task<FileSelectionResult?> EditFileSelectionAsync(
+        GameCandidate game,
+        IReadOnlyCollection<string>? existing)
+    {
+        var tree = await Task.Run(() => SelectionTree.Build(game));
+        var viewModel = new FileSelectionViewModel(game, tree, existing);
+
+        var window = new FileSelectionWindow { DataContext = viewModel };
+        await window.ShowDialog(_owner);
+
+        return viewModel.Confirmed ? viewModel.Result : null;
     }
 
     public async Task<bool> ConfirmAsync(string title, string message)

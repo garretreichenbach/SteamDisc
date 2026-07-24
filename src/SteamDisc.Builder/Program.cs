@@ -37,6 +37,7 @@ internal static class BuilderProgram
             {
                 "list" => GameCommands.List(command),
                 "inspect" => GameCommands.Inspect(command),
+                "select" => SelectionCommands.Select(command),
                 "package" => await PackageCommands.PackageAsync(command, logger).ConfigureAwait(false),
                 "iso" => await PackageCommands.BuildIsoAsync(command).ConfigureAwait(false),
                 "burn" => await PackageCommands.BurnAsync(command).ConfigureAwait(false),
@@ -131,6 +132,7 @@ internal static class BuilderProgram
             Commands:
               list [--media <id>]           List installed games; with --media, how many discs each needs
               inspect <appid|name>          Show a game's manifest, depots and advisories
+              select <appid|name>           Write an editable list of what to pack (see 'select' options)
               package <appid|name>          Package a game into disc staging folders
               iso <staging-folder>          Build a burnable ISO from a staging folder
               burn <iso>                    Hand an ISO to a disc burner
@@ -151,11 +153,17 @@ internal static class BuilderProgram
               --out <path>                  Output path
               --verbose                     Log debug detail
 
+            select options:
+              --out <path>                  Where to write the selection file (default: cwd)
+              --include-all                 Start with everything included (skip the heuristics)
+
             package options:
               --media <id>                  Target media (default bd-r); see 'media'
               --compression <level>         store | fast | balanced | maximum (default fast)
               --format <id>                 sdz (default) or 7z
               --volume-size <size>          Override the volume size, e.g. 2g
+              --selection <path>            Only pack what a 'select' file marks as included
+              --version-label <text>        Optional game version shown on the installer, e.g. v1.2
               --theme <id|folder>           Installer theme (default classic)
               --runtime <path>              Published Setup.exe to place on the disc
               --art-dir <path>              Folder of your own artwork to prefer
@@ -176,7 +184,8 @@ internal static class BuilderProgram
 
             Examples:
               steamdisc list --media dvd
-              steamdisc package 620 --media bd-r --out ~/discs/portal2
+              steamdisc select 620 --out ~/discs/portal2.selection.json
+              steamdisc package 620 --media bd-r --out ~/discs/portal2 --selection ~/discs/portal2.selection.json
               steamdisc iso ~/discs/portal2/disc --out ~/discs/portal2.iso
               steamdisc covers new --game 620 --template blank-bluray --out ~/discs/portal2/cover.json
               steamdisc covers render ~/discs/portal2/cover.json

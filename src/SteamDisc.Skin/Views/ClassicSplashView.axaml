@@ -43,14 +43,19 @@
     <Grid Margin="44,66,44,44" RowDefinitions="Auto,*">
 
       <!-- Masthead: the title logo, or the title as text when there is no logo. -->
-      <Panel Grid.Row="0" HorizontalAlignment="Left">
-        <Image Source="{Binding LogoImage}" MaxHeight="120" MaxWidth="460"
-               Stretch="Uniform" HorizontalAlignment="Left"
-               IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Text="{Binding GameTitle}" FontSize="44" FontWeight="Bold"
-                   FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}"
-                   IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNull}}" />
-      </Panel>
+      <StackPanel Grid.Row="0" HorizontalAlignment="Left" Spacing="2">
+        <Panel HorizontalAlignment="Left">
+          <Image Source="{Binding LogoImage}" MaxHeight="120" MaxWidth="460"
+                 Stretch="Uniform" HorizontalAlignment="Left"
+                 IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding GameTitle}" FontSize="44" FontWeight="Bold"
+                     FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}"
+                     IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNull}}" />
+        </Panel>
+        <TextBlock Text="{Binding VersionLabel}" FontSize="15" FontFamily="{Binding BodyFont}"
+                   Foreground="{Binding TextMutedBrush}" HorizontalAlignment="Left"
+                   IsVisible="{Binding VersionLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
 
       <!-- Stage panels share the lower region; only one is visible at a time. -->
 

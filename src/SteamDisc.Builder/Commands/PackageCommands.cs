@@ -50,6 +50,18 @@ internal static class PackageCommands
             return 1;
         }
 
+        IReadOnlyCollection<string>? exclusions = null;
+        if (command.Value("selection") is { Length: > 0 } selectionPath)
+        {
+            var selection = SelectionCommands.LoadForPackage(selectionPath, game);
+            if (selection is null)
+            {
+                return 1;
+            }
+
+            exclusions = selection.DeriveExclusions();
+        }
+
         IReadOnlyDictionary<string, string>? artwork = null;
         ArtSidecar? sidecar = null;
 
@@ -83,6 +95,8 @@ internal static class PackageCommands
             WriteHashSidecar = !command.Has("no-hashes"),
             Validate = command.Has("validate"),
             LaunchAfterInstall = !command.Has("no-launch"),
+            ExcludeRelativePaths = exclusions,
+            VersionLabel = command.Value("version-label"),
         };
 
         var progress = new ConsoleProgressReporter();
@@ -223,7 +237,8 @@ internal static class PackageCommands
         }
 
         var manifest = PayloadManifest.Load(manifestPath);
-        Console.WriteLine($"{manifest.Title} ({manifest.AppId}) — disc {manifest.Disc.Number} of {manifest.Disc.Of}");
+        var version = manifest.Version is { Length: > 0 } v ? $" {v}" : string.Empty;
+        Console.WriteLine($"{manifest.Title}{version} ({manifest.AppId}) — disc {manifest.Disc.Number} of {manifest.Disc.Of}");
         Console.WriteLine($"  Set id : {manifest.Disc.SetId}");
         Console.WriteLine($"  Format : {manifest.Archive.Format}, {manifest.Archive.Volumes.Count} volume(s)");
 
