@@ -167,6 +167,34 @@ public class ArchiveTests
         }
     }
 
+    [Theory]
+    [InlineData(ArchiveCompression.Fast)]
+    [InlineData(ArchiveCompression.Maximum)]
+    public async Task Produces_byte_identical_volumes_across_runs(ArchiveCompression compression)
+    {
+        using var temp = new TempDirectory();
+        var source = temp.CreateSubdirectory("source");
+        TestData.CreateGameFolder(source);
+
+        var engine = new SdzArchiveEngine();
+
+        async Task<byte[]> PackAsync(string name)
+        {
+            var created = await engine.CreateAsync(new ArchiveCreateRequest(
+                source, temp.CreateSubdirectory(name), "payload", SdzFormat.DefaultVolumeSize, compression));
+            Assert.Single(created.VolumePaths);
+            return await File.ReadAllBytesAsync(created.VolumePaths[0]);
+        }
+
+        // The parallel deflate pipeline farms chunks out to the thread pool, so the completion
+        // order is non-deterministic — but write order is not. Two independent packs must be
+        // byte-for-byte identical, which is what makes "did this disc change?" a hash comparison.
+        var first = await PackAsync("archive-a");
+        var second = await PackAsync("archive-b");
+
+        Assert.Equal(first, second);
+    }
+
     [Fact]
     public async Task Excludes_requested_paths()
     {
