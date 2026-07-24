@@ -559,7 +559,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Artwork = CollectArtwork(),
             RuntimeExecutablePath = string.IsNullOrWhiteSpace(RuntimeExePath) ? null : RuntimeExePath,
             WriteHashSidecar = WriteHashes,
-            LaunchAfterInstall = LaunchAfterInstall,
         };
 
         var progress = new Progress<OperationProgress>(OnProgress);
