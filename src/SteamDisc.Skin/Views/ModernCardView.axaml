@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:skin="using:SteamDisc.Skin"
+             xmlns:controls="using:SteamDisc.Skin.Controls"
+             x:Class="SteamDisc.Skin.Views.ModernCardView"
+             x:DataType="skin:SkinnedInstallerViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{Binding AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="30,11" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{Binding AccentBrush}" />
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{Binding TextMutedBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Background="{Binding BackgroundBrush}">
+    <!-- A dim wash of the background art, if any, for depth. -->
+    <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill" Opacity="0.25" />
+    <Border Background="{Binding ScrimBrush}" />
+
+    <!-- Bounded height so a long blurb can never push the buttons off the window. -->
+    <Border Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center"
+            MaxWidth="460" MaxHeight="580" CornerRadius="16" Background="{Binding SurfaceBrush}"
+            BoxShadow="0 18 50 0 #66000000">
+      <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Cover art card. -->
+        <Border Grid.Row="0" CornerRadius="10" ClipToBounds="True" Width="160" Height="240"
+                HorizontalAlignment="Center" Background="#22FFFFFF" BoxShadow="0 10 30 0 #88000000">
+          <Panel>
+            <Image Source="{Binding CoverImage}" Stretch="UniformToFill" />
+            <TextBlock Text="{Binding GameTitle}" TextWrapping="Wrap" TextAlignment="Center"
+                       VerticalAlignment="Center" Margin="12" FontSize="18" FontWeight="Bold"
+                       Foreground="{Binding TextBrush}"
+                       IsVisible="{Binding CoverImage, Converter={x:Static ObjectConverters.IsNull}}" />
+          </Panel>
+        </Border>
+
+        <TextBlock Grid.Row="1" Text="{Binding GameTitle}" FontSize="20" FontWeight="Bold" TextAlignment="Center"
+                   FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}" Margin="0,14,0,0"
+                   HorizontalAlignment="Center" TextWrapping="Wrap" />
+
+        <!-- Stage area: a scrolling body over pinned actions, so buttons always show. -->
+        <Panel Grid.Row="2" Margin="0,12,0,0">
+
+          <!-- WELCOME -->
+          <Grid IsVisible="{Binding IsWelcome}" RowDefinitions="*,Auto">
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="12">
+                <TextBlock Text="{Binding WelcomeBody}" TextWrapping="Wrap" TextAlignment="Center"
+                           FontSize="14" FontFamily="{Binding BodyFont}" Foreground="{Binding TextMutedBrush}" />
+                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" TextAlignment="Center"
+                           FontSize="12.5" FontFamily="{Binding BodyFont}" Foreground="{Binding TextMutedBrush}"
+                           IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Spacing="8" IsVisible="{Binding ShowLibraryChooser}">
+                  <TextBlock Text="Install to" FontSize="12" Foreground="{Binding TextMutedBrush}"
+                             HorizontalAlignment="Center" />
+                  <ComboBox ItemsSource="{Binding LibraryOptions}" SelectedItem="{Binding SelectedLibraryOption}"
+                            HorizontalAlignment="Stretch" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
+              <Button Classes="primary" Content="{Binding PrimaryButtonText}"
+                      Command="{Binding PrimaryCommand}" IsEnabled="{Binding IsPrimaryEnabled}" />
+              <Button Classes="link" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+                      IsVisible="{Binding ShowStoreButton}" />
+              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+            </StackPanel>
+          </Grid>
+
+          <!-- INSTALLING -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsInstalling}" VerticalAlignment="Center"
+                      HorizontalAlignment="Center">
+            <controls:ProgressRing Width="118" Height="118" HorizontalAlignment="Center"
+                                   Value="{Binding ProgressFraction}"
+                                   IsIndeterminate="{Binding IsIndeterminate}"
+                                   RingBrush="{Binding AccentBrush}" TrackBrush="{Binding TextMutedBrush}" />
+            <TextBlock Text="{Binding PhaseText}" FontSize="16" FontWeight="SemiBold" TextAlignment="Center"
+                       Foreground="{Binding TextBrush}" />
+            <TextBlock Text="{Binding StatusLine}" FontSize="12" TextAlignment="Center"
+                       TextTrimming="CharacterEllipsis" Foreground="{Binding TextMutedBrush}" />
+            <TextBlock Text="{Binding EtaText}" FontSize="12" TextAlignment="Center"
+                       Foreground="{Binding TextMutedBrush}" />
+            <Button Classes="link" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
+          </StackPanel>
+
+          <!-- COMPLETE -->
+          <Grid IsVisible="{Binding IsComplete}" RowDefinitions="*,Auto">
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding CompleteHeading}" FontSize="20" FontWeight="Bold" TextAlignment="Center"
+                           Foreground="{Binding TextBrush}" />
+                <TextBlock Text="{Binding CompleteBody}" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="{Binding TextMutedBrush}" />
+              </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
+              <Button Classes="primary" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
+              <Button Classes="link" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+                      IsVisible="{Binding ShowStoreButton}" />
+              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+            </StackPanel>
+          </Grid>
+
+          <!-- FAILED -->
+          <Grid IsVisible="{Binding IsFailed}" RowDefinitions="*,Auto">
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding ErrorHeading}" FontSize="20" FontWeight="Bold" TextAlignment="Center"
+                           Foreground="{Binding ErrorBrush}" />
+                <TextBlock Text="{Binding ErrorBody}" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
+                           Foreground="{Binding TextMutedBrush}" />
+              </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="1" Margin="0,14,0,0">
+              <Button Classes="link" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+            </StackPanel>
+          </Grid>
+
+        </Panel>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

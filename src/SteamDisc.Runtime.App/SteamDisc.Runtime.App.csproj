@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>Setup</AssemblyName>
+    <RootNamespace>SteamDisc.Runtime.App</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SteamDisc.Core\SteamDisc.Core.csproj" />
+    <ProjectReference Include="..\SteamDisc.Install\SteamDisc.Install.csproj" />
+    <ProjectReference Include="..\SteamDisc.Skin\SteamDisc.Skin.csproj" />
+  </ItemGroup>
+
+  <!--
+    Publish defaults for the disc runtime — the graphical Setup.exe that ships in the disc root.
+
+    Self-contained and single-file: it must run on a machine with no .NET installed, and be one
+    file next to autorun.inf. Trimming is OFF for the same reason as the console runtime — the
+    trimmer cannot see through System.Text.Json's reflection, which is exactly what reads
+    payload.json. IncludeNativeLibrariesForSelfExtract bundles Avalonia's Skia/HarfBuzz natives
+    into the single file, extracted to a temp folder at launch.
+  -->
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+</Project>

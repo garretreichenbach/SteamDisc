@@ -10,20 +10,21 @@ disc is a *content* delivery mechanism, not a licence.
 
 ## Status
 
-The engine layer is complete and tested end to end; the front-ends are command line. See
-[Project Plan.md](Project%20Plan.md) for the design and the remaining milestones.
+The engine layer is complete and tested end to end. Both command-line and skinned **Avalonia GUI**
+front-ends now exist. See [Project Plan.md](Project%20Plan.md) for the design and the remaining
+milestones.
 
 | Milestone | State |
 |---|---|
 | M1 Core library — Steam locator, VDF, ACF model, archive, spanning | Done |
-| M2 Runtime — extract, prerequisites, manifest injection, launch | Done (console front-end) |
-| M3 Builder — enumerate, package, transplant manifest | Done (CLI) |
+| M2 Runtime — extract, prerequisites, manifest injection, launch | Done (console + skinned GUI) |
+| M3 Builder — enumerate, package, transplant manifest | Done (CLI + GUI) |
 | M4 Imaging — ISO 9660 + Joliet, autorun, burn hand-off | Done |
-| M5 Theme engine — `theme.json`, layouts, strings | Model done; skinned UI pending |
+| M5 Theme engine — `theme.json`, layouts, strings | Done — model + skinned Avalonia UI |
 | M6 Art tooling — Steam CDN, SteamGridDB, local, cache | Done |
 | M7 Multi-disc — spanning, set verification, swap prompts | Done |
 | Cover Studio — templates, import, print-ready PDF | Done |
-| Skinned Avalonia front-ends | Not started |
+| Skinned Avalonia front-ends | Done — authoring GUI + skinned installer |
 
 The unverified part is the one the plan flags as highest risk: **spike S1**, whether a real
 Steam client accepts a transplanted manifest without re-downloading. Everything here is built so
@@ -66,6 +67,31 @@ Then make an image and burn it:
 
 ```bash
 dotnet run --project src/SteamDisc.Builder -- iso ~/discs/portal2/disc --out ~/discs/portal2.iso
+```
+
+### Or use the GUIs
+
+The same engines drive two Avalonia front-ends. The CLI stays the batch surface and the fallback;
+the GUIs are a view over exactly the same code.
+
+**Authoring GUI** — pick a game, choose media/compression/theme, attach artwork per package slot
+(one click fetches Valve's own art from the Steam CDN, or upload your own — there is no built-in
+image editor), watch a live preview of the disc's installer, then run the pipeline to a staging
+folder, an ISO, and a burn:
+
+```bash
+dotnet run --project src/SteamDisc.Builder.App
+```
+
+**Skinned installer** — the graphical `Setup.exe` that ships in the disc root. It reads the disc's
+`theme.json` and artwork and renders a per-game skin (Classic retail splash or Modern card) over
+the same install engine. Publish it, and point the authoring GUI at it so it can be stamped onto
+each disc:
+
+```bash
+dotnet publish src/SteamDisc.Runtime.App -c Release -r win-x64
+# then, to preview it against a staging folder:
+src/SteamDisc.Runtime.App/bin/Release/net8.0/win-x64/publish/Setup.exe ~/discs/portal2/disc
 ```
 
 ## How it works
@@ -291,8 +317,11 @@ src/
   SteamDisc.Imaging     ISO 9660 + Joliet writer, autorun, burn hand-off
   SteamDisc.Art         Steam CDN, SteamGridDB and local art providers, cache
   SteamDisc.Covers      print geometry, template catalogue, PDF renderer
-  SteamDisc.Runtime     Setup.exe — the disc installer
+  SteamDisc.Skin        Avalonia skin views + theme→brush mapping, shared by both GUIs
+  SteamDisc.Runtime     the console disc installer — the fallback and test harness
+  SteamDisc.Runtime.App Setup.exe — the skinned Avalonia disc installer
   SteamDisc.Builder     the authoring CLI
+  SteamDisc.Builder.App the authoring GUI
 tests/
   SteamDisc.Tests       including a full package → install → image round trip
 ```

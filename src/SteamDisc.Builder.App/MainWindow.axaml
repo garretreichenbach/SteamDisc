@@ -1,0 +1,218 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SteamDisc.Builder.App.ViewModels"
+        xmlns:skin="using:SteamDisc.Skin"
+        xmlns:img="using:SteamDisc.Imaging"
+        x:Class="SteamDisc.Builder.App.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1240" Height="820" MinWidth="1080" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Title="SteamDisc — Author">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,4,0,2" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="0,2,0,2" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16" />
+      <Setter Property="Background" Value="#1E1F24" />
+    </Style>
+  </Window.Styles>
+
+  <Grid ColumnDefinitions="460,*" Margin="14" ColumnSpacing="14">
+
+    <!-- ================= LEFT: inputs ================= -->
+    <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="14">
+
+        <TextBlock Text="SteamDisc" FontSize="22" FontWeight="Bold" />
+        <TextBlock Text="Turn an installed game into a burnable, skinned disc." Classes="label" />
+
+        <!-- 1 · Choose a game -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="1 · Choose a game" Classes="h2" />
+            <TextBox Text="{Binding SearchText}" Watermark="Search installed games…" />
+            <ListBox ItemsSource="{Binding Games}" SelectedItem="{Binding SelectedGame, Mode=TwoWay}"
+                     MaxHeight="240" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:GameItem">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding SubtitleText}" Classes="label" />
+                    </StackPanel>
+                    <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="4"
+                            Padding="7,2" Background="{Binding SuitabilityBrush}">
+                      <TextBlock Text="{Binding SuitabilityLabel}" FontSize="11" Foreground="Black" />
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Border>
+
+        <!-- 2 · Package -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="2 · Package" Classes="h2" />
+
+            <TextBlock Text="Output folder" Classes="label" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBox Grid.Column="0" Text="{Binding OutputFolder}" Watermark="Where to build the disc…" />
+              <Button Grid.Column="1" Content="Browse…" Command="{Binding BrowseOutputCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="Media" Classes="label" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Media}"
+                          SelectedItem="{Binding SelectedMedium, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="img:OpticalMedium">
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Text="Compression" Classes="label" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding CompressionOptions}"
+                          SelectedItem="{Binding SelectedCompression, Mode=TwoWay}" />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Text="{Binding EstimateText}" FontSize="12" Foreground="#8FA0BF"
+                       IsVisible="{Binding EstimateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="Archive format" Classes="label" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding FormatOptions}"
+                          SelectedItem="{Binding SelectedFormat, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Text="Theme" Classes="label" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Themes}"
+                          SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Text="Description (shown on the installer)" Classes="label" Margin="0,4,0,0" />
+            <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap"
+                     Height="74" Watermark="Fetched from Steam when you pick a game — edit freely…" />
+            <Button Content="Re-fetch from Steam" HorizontalAlignment="Left" Padding="10,4" FontSize="12"
+                    Command="{Binding RefetchDescriptionCommand}" />
+
+            <StackPanel Spacing="3" Margin="0,4,0,0">
+              <CheckBox Content="Verify files locally after install" IsChecked="{Binding ValidateAfterInstall}" />
+              <CheckBox Content="Launch the game after install" IsChecked="{Binding LaunchAfterInstall}" />
+              <CheckBox Content="Write SHA-256 hash sidecar" IsChecked="{Binding WriteHashes}" />
+            </StackPanel>
+
+            <TextBlock Text="Runtime Setup.exe (stamped onto the disc)" Classes="label" Margin="0,4,0,0" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBox Grid.Column="0" Text="{Binding RuntimeExePath}" Watermark="Publish SteamDisc.Runtime.App…" />
+              <Button Grid.Column="1" Content="Locate…" Command="{Binding LocateRuntimeCommand}" />
+            </Grid>
+            <TextBlock Classes="label" Foreground="#F5B32B"
+                       Text="No runtime found — the disc will have no Setup.exe until you publish one."
+                       IsVisible="{Binding RuntimeExePath, Converter={x:Static ObjectConverters.IsNull}}" />
+          </StackPanel>
+        </Border>
+
+        <!-- 3 · Artwork -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="3 · Artwork" Classes="h2" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Content="Auto-fetch all from Steam"
+                      Command="{Binding AutoFetchAllCommand}" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding ArtSlots}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArtSlotViewModel">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,4">
+                    <Border Grid.Column="0" Width="72" Height="46" CornerRadius="4"
+                            Background="#111214" ClipToBounds="True">
+                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="Steam CDN" Padding="10,4" FontSize="12"
+                                Command="{Binding FetchFromSteamCommand}"
+                                IsVisible="{Binding SupportsCdn}" />
+                        <Button Content="Upload…" Padding="10,4" FontSize="12"
+                                Command="{Binding UploadCommand}" />
+                        <Button Content="Clear" Padding="10,4" FontSize="12"
+                                Command="{Binding ClearCommand}"
+                                IsVisible="{Binding SourcePath, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      </StackPanel>
+                      <TextBlock Text="{Binding Status}" Classes="label" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ================= RIGHT: preview + pipeline ================= -->
+    <Grid Grid.Column="1" RowDefinitions="*,Auto,Auto" RowSpacing="14">
+
+      <Border Grid.Row="0" Classes="card" Padding="12">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <TextBlock Grid.Row="0" Text="Live preview — how the disc's installer will look" Classes="h2" />
+          <Border Grid.Row="1" CornerRadius="6" ClipToBounds="True" Background="#0A0A0C">
+            <Viewbox Stretch="Uniform" Margin="8">
+              <skin:SkinHost Width="900" Height="600"
+                             Layout="{Binding PreviewLayout}" Installer="{Binding Preview}" />
+            </Viewbox>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1" Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Build disc" Command="{Binding BuildCommand}"
+                    FontWeight="SemiBold" Padding="20,10" />
+            <Button Content="Build ISO" Command="{Binding BuildIsoCommand}" Padding="20,10" />
+            <Button Content="Burn…" Command="{Binding BurnCommand}" Padding="20,10" />
+          </StackPanel>
+
+          <StackPanel Spacing="4" IsVisible="{Binding IsBusy}">
+            <ProgressBar Minimum="0" Maximum="1" Height="8"
+                         Value="{Binding ProgressValue}" IsIndeterminate="{Binding IsProgressIndeterminate}" />
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Grid.Column="0" Text="{Binding ProgressPhase}" Classes="label" />
+              <TextBlock Grid.Column="1" Text="{Binding ProgressStatus}" Classes="label"
+                         Margin="10,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="2" Text="{Binding ProgressEta}" Classes="label" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="2" Classes="card">
+        <TextBox Text="{Binding StatusText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
+                 TextWrapping="Wrap" Height="150" Background="Transparent" BorderThickness="0"
+                 FontFamily="Cascadia Code,Consolas,monospace" FontSize="12" />
+      </Border>
+
+    </Grid>
+  </Grid>
+</Window>

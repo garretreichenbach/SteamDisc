@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:skin="using:SteamDisc.Skin"
+             xmlns:sys="using:System"
+             x:Class="SteamDisc.Skin.Views.ClassicSplashView"
+             x:DataType="skin:SkinnedInstallerViewModel">
+
+  <UserControl.Resources>
+    <!-- Corner radius reused by the action buttons. -->
+    <CornerRadius x:Key="ButtonRadius">4</CornerRadius>
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{Binding AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="26,12" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{Binding AccentBrush}" />
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{Binding TextBrush}" />
+      <Setter Property="BorderBrush" Value="{Binding TextMutedBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="22,12" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Background="{Binding BackgroundBrush}">
+    <!-- Layer 1: full-bleed key art. Null source simply shows nothing. -->
+    <Image Source="{Binding BackgroundImage}" Stretch="UniformToFill" />
+
+    <!-- Layer 2: a wash so text stays legible over any art. -->
+    <Border Background="{Binding ScrimBrush}" />
+
+    <!-- Layer 3: content. -->
+    <Grid Margin="44" RowDefinitions="Auto,*">
+
+      <!-- Masthead: the title logo, or the title as text when there is no logo. -->
+      <Panel Grid.Row="0" HorizontalAlignment="Left">
+        <Image Source="{Binding LogoImage}" MaxHeight="120" MaxWidth="460"
+               Stretch="Uniform" HorizontalAlignment="Left"
+               IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Text="{Binding GameTitle}" FontSize="44" FontWeight="Bold"
+                   FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}"
+                   IsVisible="{Binding LogoImage, Converter={x:Static ObjectConverters.IsNull}}" />
+      </Panel>
+
+      <!-- Stage panels share the lower region; only one is visible at a time. -->
+
+      <!-- WELCOME -->
+      <Grid Grid.Row="1" IsVisible="{Binding IsWelcome}" RowDefinitions="*,Auto">
+        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Text="{Binding WelcomeBody}" TextWrapping="Wrap" FontSize="18"
+                     FontFamily="{Binding BodyFont}" Foreground="{Binding TextBrush}" />
+          <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto" HorizontalAlignment="Left"
+                        IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="13.5"
+                       FontFamily="{Binding BodyFont}" Foreground="{Binding TextMutedBrush}" />
+          </ScrollViewer>
+          <StackPanel Spacing="2" Margin="0,8,0,0">
+            <TextBlock Text="{Binding InstallTargetText}" FontSize="13" Foreground="{Binding TextMutedBrush}" />
+            <TextBlock Text="{Binding SizeText}" FontSize="13" Foreground="{Binding TextMutedBrush}" />
+            <TextBlock Text="{Binding FreeText}" FontSize="13" Foreground="{Binding TextMutedBrush}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0"
+                      IsVisible="{Binding ShowLibraryChooser}">
+            <TextBlock Text="Install to" VerticalAlignment="Center" Foreground="{Binding TextMutedBrush}" />
+            <ComboBox ItemsSource="{Binding LibraryOptions}" SelectedItem="{Binding SelectedLibraryOption}"
+                      MinWidth="320" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,6,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="sys:String">
+                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" Foreground="#F5B32B" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,24,0,0" HorizontalAlignment="Left">
+          <Button Classes="primary" Content="{Binding PrimaryButtonText}"
+                  Command="{Binding PrimaryCommand}" IsEnabled="{Binding IsPrimaryEnabled}" />
+          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+          <Button Classes="secondary" Content="{Binding StoreButtonText}" Command="{Binding StoreCommand}"
+                  IsVisible="{Binding ShowStoreButton}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- INSTALLING -->
+      <Grid Grid.Row="1" IsVisible="{Binding IsInstalling}" RowDefinitions="*,Auto">
+        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="720" HorizontalAlignment="Left">
+          <TextBlock Text="{Binding PhaseText}" FontSize="22" FontWeight="SemiBold"
+                     FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}" />
+          <TextBlock Text="{Binding StatusLine}" FontSize="13" Foreground="{Binding TextMutedBrush}"
+                     TextTrimming="CharacterEllipsis" />
+          <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressFraction}"
+                       IsIndeterminate="{Binding IsIndeterminate}" Height="10"
+                       Foreground="{Binding AccentBrush}" />
+          <StackPanel Orientation="Horizontal" Spacing="24">
+            <TextBlock Text="{Binding ThroughputText}" FontSize="13" Foreground="{Binding TextMutedBrush}" />
+            <TextBlock Text="{Binding EtaText}" FontSize="13" Foreground="{Binding TextMutedBrush}" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,24,0,0" HorizontalAlignment="Left">
+          <Button Classes="secondary" Content="{Binding CancelButtonText}" Command="{Binding CancelCommand}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- COMPLETE -->
+      <Grid Grid.Row="1" IsVisible="{Binding IsComplete}" RowDefinitions="*,Auto">
+        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Text="{Binding CompleteHeading}" FontSize="30" FontWeight="Bold"
+                     FontFamily="{Binding HeadingFont}" Foreground="{Binding TextBrush}" />
+          <TextBlock Text="{Binding CompleteBody}" FontSize="17" TextWrapping="Wrap"
+                     FontFamily="{Binding BodyFont}" Foreground="{Binding TextBrush}" />
+          <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,6,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="sys:String">
+                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" Foreground="#F5B32B" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,24,0,0" HorizontalAlignment="Left">
+          <Button Classes="primary" Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryCommand}" />
+          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- FAILED -->
+      <Grid Grid.Row="1" IsVisible="{Binding IsFailed}" RowDefinitions="*,Auto">
+        <StackPanel Grid.Row="0" VerticalAlignment="Bottom" Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Text="{Binding ErrorHeading}" FontSize="30" FontWeight="Bold"
+                     FontFamily="{Binding HeadingFont}" Foreground="{Binding ErrorBrush}" />
+          <TextBlock Text="{Binding ErrorBody}" FontSize="15" TextWrapping="Wrap"
+                     FontFamily="{Binding BodyFont}" Foreground="{Binding TextBrush}" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,24,0,0" HorizontalAlignment="Left">
+          <Button Classes="secondary" Content="{Binding ExitButtonText}" Command="{Binding ExitCommand}" />
+        </StackPanel>
+      </Grid>
+
+    </Grid>
+  </Grid>
+</UserControl>
