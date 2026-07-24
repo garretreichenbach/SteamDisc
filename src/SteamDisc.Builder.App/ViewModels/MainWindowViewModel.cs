@@ -156,9 +156,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private ThemeOption? _selectedTheme;
 
     [ObservableProperty]
-    private bool _validateAfterInstall;
-
-    [ObservableProperty]
     private bool _launchAfterInstall = true;
 
     [ObservableProperty]
@@ -565,7 +562,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Artwork = CollectArtwork(),
             RuntimeExecutablePath = string.IsNullOrWhiteSpace(RuntimeExePath) ? null : RuntimeExePath,
             WriteHashSidecar = WriteHashes,
-            Validate = ValidateAfterInstall,
             LaunchAfterInstall = LaunchAfterInstall,
         };
 

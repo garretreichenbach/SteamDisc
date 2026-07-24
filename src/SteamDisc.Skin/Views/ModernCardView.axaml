@@ -6,6 +6,11 @@
              x:DataType="skin:SkinnedInstallerViewModel">
 
   <UserControl.Styles>
+    <!--
+      The normal fill goes on the Button so the theme's template binding carries it. Hover and
+      pressed swap in a shaded accent on the template part, with the theme's transitions off -
+      animating opacity here instead makes the two styles fight every frame and flicker.
+    -->
     <Style Selector="Button.primary">
       <Setter Property="Background" Value="{Binding AccentBrush}" />
       <Setter Property="Foreground" Value="White" />
@@ -17,9 +22,16 @@
       <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{Binding AccentBrush}" />
-      <Setter Property="Opacity" Value="0.85" />
+      <Setter Property="Background" Value="{Binding AccentHoverBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Transitions" Value="{x:Null}" />
     </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="{Binding AccentPressedBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Transitions" Value="{x:Null}" />
+    </Style>
+
     <Style Selector="Button.link">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{Binding TextMutedBrush}" />
@@ -27,6 +39,16 @@
       <Setter Property="Padding" Value="8,5" />
       <Setter Property="HorizontalAlignment" Value="Center" />
       <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#22FFFFFF" />
+      <Setter Property="Foreground" Value="{Binding TextBrush}" />
+      <Setter Property="Transitions" Value="{x:Null}" />
+    </Style>
+    <Style Selector="Button.link:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="#12FFFFFF" />
+      <Setter Property="Foreground" Value="{Binding TextBrush}" />
+      <Setter Property="Transitions" Value="{x:Null}" />
     </Style>
   </UserControl.Styles>
 
@@ -80,6 +102,8 @@
                   <ComboBox ItemsSource="{Binding LibraryOptions}" SelectedItem="{Binding SelectedLibraryOption}"
                             HorizontalAlignment="Stretch" />
                 </StackPanel>
+                <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"
+                          Foreground="{Binding TextBrush}" FontSize="12" HorizontalAlignment="Center" />
               </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">

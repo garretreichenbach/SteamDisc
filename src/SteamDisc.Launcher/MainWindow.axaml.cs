@@ -1,12 +1,17 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using SteamDisc.Launcher.Updates;
 
 namespace SteamDisc.Launcher;
 
 public partial class MainWindow : Window
 {
+    private UpdateInfo? _availableUpdate;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -16,6 +21,8 @@ public partial class MainWindow : Window
         {
             VersionLabel.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
         }
+
+        Opened += async (_, _) => await CheckForUpdatesAsync();
     }
 
     private void OnCreate(object? sender, RoutedEventArgs e)
@@ -51,6 +58,65 @@ public partial class MainWindow : Window
         }
 
         Launch(setup, path);
+    }
+
+    /// <summary>
+    /// Looks for a newer published release. Silent when there is none, when the network is
+    /// unavailable, or when running from a dev tree rather than an installed bundle.
+    /// </summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        if (!UpdateChecker.IsPackagedBundle)
+        {
+            return;
+        }
+
+        var update = await new UpdateChecker().CheckAsync();
+        if (update is null)
+        {
+            return;
+        }
+
+        _availableUpdate = update;
+        UpdateTitle.Text = $"Update available — {update.TagName}";
+        UpdateDetail.Text = $"You have v{UpdateChecker.CurrentVersion}. SteamDisc will update and restart itself.";
+        UpdateBanner.IsVisible = true;
+    }
+
+    private async void OnUpdate(object? sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate is null)
+        {
+            return;
+        }
+
+        UpdateButton.IsEnabled = false;
+        try
+        {
+            var updater = new Updater();
+            UpdateDetail.Text = "Downloading…";
+            var progress = new Progress<double>(f => UpdateDetail.Text = $"Downloading… {f:P0}");
+
+            var archive = await updater.DownloadAsync(_availableUpdate, progress);
+
+            UpdateDetail.Text = "Installing and restarting…";
+            updater.ApplyAndRestart(archive);
+
+            // Exit so the swap script can replace the files it just copied in behind us.
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+            else
+            {
+                Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateDetail.Text = "Update failed: " + ex.Message;
+            UpdateButton.IsEnabled = true;
+        }
     }
 
     private void Launch(string exePath, string? argument = null)

@@ -14,6 +14,8 @@ namespace SteamDisc.Skin;
 /// <param name="Scrim">A translucent wash over full-bleed art so text stays readable.</param>
 public sealed record SkinPalette(
     IBrush Accent,
+    IBrush AccentHover,
+    IBrush AccentPressed,
     IBrush Background,
     IBrush Surface,
     IBrush Text,
@@ -53,9 +55,12 @@ public static class ThemeResources
     {
         var colors = definition.Colors;
         var background = ThemeColor.Parse(colors.Background, DefaultBackground);
+        var accent = ThemeColor.Parse(colors.Accent, DefaultAccent);
 
         return new SkinPalette(
-            Accent: ToBrush(ThemeColor.Parse(colors.Accent, DefaultAccent)),
+            Accent: ToBrush(accent),
+            AccentHover: ToBrush(Shade(accent, 0.18)),
+            AccentPressed: ToBrush(Shade(accent, -0.18)),
             Background: ToBrush(background),
             Surface: ToBrush(ThemeColor.Parse(colors.Surface, DefaultSurface)),
             Text: ToBrush(ThemeColor.Parse(colors.Text, DefaultText)),
@@ -73,6 +78,8 @@ public static class ThemeResources
     {
         var palette = PaletteFor(definition);
         viewModel.AccentBrush = palette.Accent;
+        viewModel.AccentHoverBrush = palette.AccentHover;
+        viewModel.AccentPressedBrush = palette.AccentPressed;
         viewModel.BackgroundBrush = palette.Background;
         viewModel.SurfaceBrush = palette.Surface;
         viewModel.TextBrush = palette.Text;
@@ -125,6 +132,19 @@ public static class ThemeResources
 
     private static SolidColorBrush ToBrush(ThemeColor color)
         => new(Color.FromArgb(color.A, color.R, color.G, color.B));
+
+    /// <summary>Lightens (positive amount) or darkens (negative) a colour, for hover states.</summary>
+    private static ThemeColor Shade(ThemeColor color, double amount)
+    {
+        static byte Channel(byte value, double amount) => (byte)Math.Clamp(
+            amount >= 0 ? value + ((255 - value) * amount) : value * (1 + amount), 0, 255);
+
+        return new ThemeColor(
+            Channel(color.R, amount),
+            Channel(color.G, amount),
+            Channel(color.B, amount),
+            color.A);
+    }
 
     /// <summary>A ~70% wash in the background colour, for legibility over full-bleed art.</summary>
     private static SolidColorBrush ScrimFor(ThemeColor background)

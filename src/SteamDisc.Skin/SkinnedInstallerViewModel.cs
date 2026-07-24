@@ -60,6 +60,14 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     [ObservableProperty]
     private IBrush _accentBrush = Brushes.OrangeRed;
 
+    /// <summary>Accent lightened for hover, so buttons can give feedback by swapping a brush
+    /// rather than animating opacity — which fights the theme and flickers.</summary>
+    [ObservableProperty]
+    private IBrush _accentHoverBrush = Brushes.OrangeRed;
+
+    [ObservableProperty]
+    private IBrush _accentPressedBrush = Brushes.OrangeRed;
+
     [ObservableProperty]
     private IBrush _backgroundBrush = Brushes.Black;
 
@@ -168,6 +176,17 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
 
     /// <summary>Non-fatal problems surfaced before or during the install.</summary>
     public ObservableCollection<string> Warnings { get; } = new();
+
+    // --- Install options (chosen by whoever is installing, not by the author) ----------
+    /// <summary>
+    /// Ask Steam to verify the installed files afterwards. Slower, but self-healing if the
+    /// transplanted manifest turns out to be imperfect.
+    /// </summary>
+    [ObservableProperty]
+    private bool _verifyAfterInstall;
+
+    [ObservableProperty]
+    private string _verifyOptionText = "Verify game files after install";
 
     // --- Library choice ----------------------------------------------------
     // Libraries are represented as display strings so the skin stays decoupled from Steam types;

@@ -92,6 +92,9 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             GameTitle = _manifest.Title;
             StoreUrl = $"https://store.steampowered.com/app/{_manifest.AppId}/";
             ShowStoreButton = _manifest.AppId != 0;
+
+            // The disc carries a default; the person installing gets the final say.
+            VerifyAfterInstall = _manifest.PostInstall.Validate;
             _tokens["title"] = _manifest.Title;
             _tokens["disc"] = _manifest.Disc.Number.ToString(CultureInfo.InvariantCulture);
             _tokens["discCount"] = _manifest.Disc.Of.ToString(CultureInfo.InvariantCulture);
@@ -273,8 +276,13 @@ public sealed class InstallerController : SkinnedInstallerViewModel
 
         _cts = new CancellationTokenSource();
 
-        // Launch is left to the Play button, retail-style, rather than firing automatically.
-        var request = new InstallRequest(_manifest, _args.DiscRoot, library, _steam) { Launch = false };
+        // Launch follows the disc's own choice: if the author ticked "launch after install" the
+        // engine starts the game, otherwise the Play button on the completion screen does.
+        // Verification is the installer's own checkbox, so it is passed explicitly.
+        var request = new InstallRequest(_manifest, _args.DiscRoot, library, _steam)
+        {
+            ValidateAfterInstall = VerifyAfterInstall,
+        };
         var progress = new Progress<OperationProgress>(OnProgress);
 
         InstallResult result;
