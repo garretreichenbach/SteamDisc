@@ -249,6 +249,16 @@ public abstract partial class SkinnedInstallerViewModel : ObservableObject
     [ObservableProperty]
     private string _launchOptionText = "Launch the game when finished";
 
+    /// <summary>Offered only when run from a portable USB library: play from it rather than install.</summary>
+    [ObservableProperty]
+    private bool _showPlayFromDriveOption;
+
+    [ObservableProperty]
+    private bool _playFromDrive;
+
+    [ObservableProperty]
+    private string _playFromDriveOptionText = "Play directly from this drive (no install)";
+
     // --- Library choice ----------------------------------------------------
     // Libraries are represented as display strings so the skin stays decoupled from Steam types;
     // the front-end keeps the mapping back to the real library.

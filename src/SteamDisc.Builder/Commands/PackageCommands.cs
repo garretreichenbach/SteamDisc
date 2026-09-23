@@ -7,6 +7,7 @@ using SteamDisc.Core.Steam;
 using SteamDisc.Core.Theming;
 using SteamDisc.Imaging;
 using SteamDisc.Imaging.Iso;
+using SteamDisc.Install;
 
 namespace SteamDisc.Builder.Commands;
 
@@ -28,6 +29,13 @@ internal static class PackageCommands
             Console.Error.WriteLine(
                 $"Unknown media '{command.Value("media")}'. Options: " +
                 string.Join(", ", OpticalMedium.All.Select(m => m.Id)) + ".");
+            return 1;
+        }
+
+        // Checked before the art fetch, so a missing drive fails fast rather than after the network.
+        if (medium.IsUsbDrive && (command.Value("out") is not { Length: > 0 } drive || !Directory.Exists(drive)))
+        {
+            Console.Error.WriteLine("With --media usb, --out must be the USB drive, e.g. --out E:\\");
             return 1;
         }
 
@@ -68,6 +76,11 @@ internal static class PackageCommands
         if (!command.Has("no-art"))
         {
             (artwork, sidecar) = await FetchArtworkAsync(game, command, logger).ConfigureAwait(false);
+        }
+
+        if (medium.IsUsbDrive)
+        {
+            return await WriteUsbAsync(command, steam, game, exclusions, theme, artwork, logger).ConfigureAwait(false);
         }
 
         Console.WriteLine($"Packaging {game.Name} ({game.AppId})");
@@ -138,6 +151,73 @@ internal static class PackageCommands
         Console.WriteLine($"  Test it   : dotnet run --project src/SteamDisc.Runtime -- \"{result.DiscRoots[0]}\"");
         Console.WriteLine($"  Make ISOs : steamdisc iso \"{result.DiscRoots[0]}\"");
 
+        return 0;
+    }
+
+    /// <summary>
+    /// <c>package --media usb</c>: copies the game uncompressed onto a USB drive as a Steam
+    /// library it can be played from directly, instead of packaging it for disc.
+    /// </summary>
+    private static async Task<int> WriteUsbAsync(
+        CommandLine command,
+        SteamInstallation steam,
+        GameCandidate game,
+        IReadOnlyCollection<string>? exclusions,
+        ThemeDefinition theme,
+        IReadOnlyDictionary<string, string>? artwork,
+        ISteamDiscLogger logger)
+    {
+        var drive = command.Value("out")!;
+
+        Console.WriteLine($"Writing {game.Name} ({game.AppId}) to {drive} as a playable Steam library");
+        Console.WriteLine($"  Source: {game.InstallPath}");
+        Console.WriteLine($"  Size  : {Format.Bytes(game.MeasuredSize)}");
+        Console.WriteLine();
+
+        var progress = new ConsoleProgressReporter();
+        LibraryCopyResult result;
+        try
+        {
+            result = await PortableLibrary
+                .WriteAsync(game.App, drive, exclusions, command.Value("runtime"), theme, artwork, progress)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            progress.Complete();
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Wrote {result.Files} files, {Format.Bytes(result.Bytes)}" +
+                          (result.SkippedFiles > 0 ? $" ({result.SkippedFiles} already up to date)." : "."));
+        foreach (var warning in result.Warnings)
+        {
+            Console.WriteLine("  ! " + warning);
+        }
+
+        if (command.Has("register"))
+        {
+            var registration = await PortableLibrary
+                .RegisterAsync(steam, result.Library, new UnattendedInstallHost(), logger)
+                .ConfigureAwait(false);
+            Console.WriteLine(registration.Succeeded ? registration.Message : "  x " + registration.Message);
+            return registration.Succeeded ? 0 : 1;
+        }
+
+        if (PortableLibrary.MeasureReadSpeed(result.Library) is { } speed)
+        {
+            Console.WriteLine(
+                $"Drive reads at {speed:0} MB/s: " +
+                (speed >= PortableLibrary.PlayableMegabytesPerSecond
+                    ? "fast enough to play from directly."
+                    : "better to install from than to play from."));
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(command.Value("runtime") is { Length: > 0 }
+            ? $"On any PC, run {PortableLibrary.SetupExecutableName} from the drive to play from it or install it."
+            : "Pass --runtime <Setup.exe> to put a play-or-install launcher on the drive.");
+        Console.WriteLine("On this PC, close Steam and re-run with --register to play from the drive.");
         return 0;
     }
 

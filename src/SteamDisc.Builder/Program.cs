@@ -158,7 +158,8 @@ internal static class BuilderProgram
               --include-all                 Start with everything included (skip the heuristics)
 
             package options:
-              --media <id>                  Target media (default bd-r); see 'media'
+              --media <id>                  Target media (default bd-r); see 'media'. 'usb' copies the
+                                            game uncompressed to the drive given by --out, playable from it
               --compression <level>         store | fast | balanced | maximum (default fast)
               --format <id>                 sdz (default) or 7z
               --volume-size <size>          Override the volume size, e.g. 2g
@@ -171,6 +172,7 @@ internal static class BuilderProgram
               --no-art                      Do not fetch artwork
               --no-hashes                   Skip the SHA-256 sidecar
               --validate                    Ask Steam to verify files after installing
+              --register                    With --media usb: add the drive to this PC's Steam (Steam closed)
 
             covers options:
               --template <id>               Template to use (default sgc-dvd)
@@ -186,6 +188,7 @@ internal static class BuilderProgram
               steamdisc list --media dvd
               steamdisc select 620 --out ~/discs/portal2.selection.json
               steamdisc package 620 --media bd-r --out ~/discs/portal2 --selection ~/discs/portal2.selection.json
+              steamdisc package 620 --media usb --out E:\ --runtime publish/runtime/Setup.exe
               steamdisc iso ~/discs/portal2/disc --out ~/discs/portal2.iso
               steamdisc covers new --game 620 --template blank-bluray --out ~/discs/portal2/cover.json
               steamdisc covers render ~/discs/portal2/cover.json

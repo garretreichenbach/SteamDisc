@@ -80,6 +80,9 @@
                             HorizontalAlignment="Stretch" />
                 </StackPanel>
                 <StackPanel Spacing="2" HorizontalAlignment="Center">
+                  <CheckBox Content="{Binding PlayFromDriveOptionText}" IsChecked="{Binding PlayFromDrive}"
+                            IsVisible="{Binding ShowPlayFromDriveOption}"
+                            Foreground="{Binding TextBrush}" FontSize="12" />
                   <CheckBox Content="{Binding LaunchOptionText}" IsChecked="{Binding LaunchWhenFinished}"
                             Foreground="{Binding TextBrush}" FontSize="12" />
                   <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"

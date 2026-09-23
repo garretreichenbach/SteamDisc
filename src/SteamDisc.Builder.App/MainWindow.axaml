@@ -73,7 +73,7 @@
 
             <TextBlock Text="Output folder" Classes="label" />
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-              <TextBox Grid.Column="0" Text="{Binding OutputFolder}" Watermark="Where to build the disc…" />
+              <TextBox Grid.Column="0" Text="{Binding OutputFolder}" Watermark="Where to build the disc — or the USB drive, e.g. E:\" />
               <Button Grid.Column="1" Content="Browse…" Command="{Binding BrowseOutputCommand}" />
             </Grid>
 
@@ -92,7 +92,7 @@
               <StackPanel Grid.Column="1" Spacing="2">
                 <TextBlock Text="Compression" Classes="label" />
                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding CompressionOptions}"
-                          SelectedItem="{Binding SelectedCompression, Mode=TwoWay}" />
+                          SelectedItem="{Binding SelectedCompression, Mode=TwoWay}" IsEnabled="{Binding !IsUsb}" />
               </StackPanel>
             </Grid>
 
@@ -103,7 +103,7 @@
               <StackPanel Grid.Column="0" Spacing="2">
                 <TextBlock Text="Archive format" Classes="label" />
                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding FormatOptions}"
-                          SelectedItem="{Binding SelectedFormat, Mode=TwoWay}" />
+                          SelectedItem="{Binding SelectedFormat, Mode=TwoWay}" IsEnabled="{Binding !IsUsb}" />
               </StackPanel>
               <StackPanel Grid.Column="1" Spacing="2">
                 <TextBlock Text="Theme" Classes="label" />
@@ -210,7 +210,7 @@
       <Border Grid.Row="1" Classes="card">
         <StackPanel Spacing="10">
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Build disc" Command="{Binding BuildCommand}"
+            <Button Content="{Binding BuildButtonText}" Command="{Binding BuildCommand}"
                     FontWeight="SemiBold" Padding="20,10" />
             <Button Content="Test install" Command="{Binding TestInstallCommand}" Padding="20,10"
                     ToolTip.Tip="Run the disc's own Setup.exe against the staging folder before burning." />

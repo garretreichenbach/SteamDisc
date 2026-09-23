@@ -1,4 +1,5 @@
 using System.Globalization;
+using SteamDisc.Core.Vdf;
 
 namespace SteamDisc.Core.Steam;
 
@@ -23,6 +24,44 @@ public sealed class SteamLibrary
     public string InstallPath(string installDir) => System.IO.Path.Combine(CommonPath, installDir);
 
     public bool Exists => Directory.Exists(SteamAppsPath);
+
+    /// <summary>
+    /// The marker Steam writes into every library other than its own install folder. Its
+    /// presence is what lets a library on a removable drive be recognised on another machine.
+    /// </summary>
+    public string LibraryFolderFilePath => System.IO.Path.Combine(SteamAppsPath, "libraryfolder.vdf");
+
+    /// <summary>True when this folder is a self-describing library, e.g. a portable USB library.</summary>
+    public bool IsPortable => File.Exists(LibraryFolderFilePath);
+
+    /// <summary>
+    /// Writes <c>libraryfolder.vdf</c> if it is missing, the same marker Steam's "Add Drive"
+    /// creates. Returns the library's content id, reusing an existing one.
+    /// </summary>
+    public string EnsureLibraryFolderFile()
+    {
+        if (IsPortable)
+        {
+            try
+            {
+                if (VdfTextReader.ParseFile(LibraryFolderFilePath).GetString("contentid") is { Length: > 0 } existing)
+                {
+                    return existing;
+                }
+            }
+            catch (VdfSyntaxException)
+            {
+                // Rewritten below.
+            }
+        }
+
+        var contentId = Random.Shared.NextInt64(1, long.MaxValue).ToString(CultureInfo.InvariantCulture);
+        var root = KvNode.Object("libraryfolder");
+        root.SetString("contentid", contentId);
+        root.SetString("label", string.Empty);
+        VdfTextWriter.WriteFile(LibraryFolderFilePath, root);
+        return contentId;
+    }
 
     /// <summary>Free space on the volume backing this library, or <see langword="null"/> if unknown.</summary>
     public long? GetAvailableFreeBytes()
