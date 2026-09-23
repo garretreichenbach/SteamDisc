@@ -1,4 +1,5 @@
 using SteamDisc.Core.Steam;
+using SteamDisc.Core.Theming;
 using SteamDisc.Install;
 
 namespace SteamDisc.Tests;
@@ -18,10 +19,12 @@ public class PortableLibraryTests
         var source = authoring.InstallGame();
         var drive = temp.CreateSubdirectory("usb");
 
-        var written = await PortableLibrary.WriteAsync(source, drive, excludeRelativePaths: new[] { "data/nested" });
+        var written = await PortableLibrary.WriteAsync(
+            source, drive, excludeRelativePaths: new[] { "data/nested" }, theme: BuiltInThemes.ValveRetail2011());
 
         var usb = new SteamLibrary(drive);
         Assert.True(usb.IsPortable);
+        Assert.True(File.Exists(Path.Combine(drive, PortableLibrary.ThemeFolderName, ThemeDefinition.FileName)));
         Assert.Empty(written.Warnings);
         Assert.False(Directory.Exists(Path.Combine(usb.InstallPath("Portal 2"), "data", "nested")));
 
@@ -51,5 +54,14 @@ public class PortableLibraryTests
         Assert.NotNull(installed);
         Assert.Equal(FakeSteam.LocalSteamId, installed!.Manifest.LastOwner);
         Assert.True(installed.IsFullyInstalled);
+
+        // Same drive back under another letter: Steam's entry is repointed, not duplicated.
+        var newLetter = temp.CreateSubdirectory("usb-new-letter");
+        var before = other.Installation.ReadLibraryFolderPaths().Count;
+        Assert.True(other.Installation.RegisterLibrary(newLetter, usb.EnsureLibraryFolderFile()));
+        var after = other.Installation.ReadLibraryFolderPaths();
+        Assert.Equal(before, after.Count);
+        Assert.Contains(Path.GetFullPath(newLetter), after);
+        Assert.DoesNotContain(usb.Path, after);
     }
 }

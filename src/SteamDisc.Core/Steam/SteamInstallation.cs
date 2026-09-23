@@ -116,7 +116,8 @@ public sealed class SteamInstallation
 
     /// <summary>
     /// Adds a library folder to <c>libraryfolders.vdf</c>, which is how a portable library on a
-    /// USB drive becomes visible to this client. Returns false if it was already listed.
+    /// USB drive becomes visible to this client. An entry with the same content id (the same
+    /// drive seen under another letter) is repointed instead. Returns false if already listed.
     /// </summary>
     /// <remarks>
     /// Steam rewrites this file from memory when it exits, so the client must be closed first
@@ -147,6 +148,17 @@ public sealed class SteamInstallation
             // A file we cannot parse is left alone rather than replaced: it is Steam's, not ours.
             var root = File.Exists(file) ? VdfTextReader.ParseFile(file) : KvNode.Object("libraryfolders");
             var container = LibraryFoldersContainer(root);
+
+            // Same drive under a new letter: move Steam's existing entry rather than add a second
+            // one, so the old path does not linger as a permanently missing library.
+            var moved = container.Children.FirstOrDefault(c =>
+                c.IsObject && string.Equals(c.GetString("contentid"), contentId, StringComparison.Ordinal));
+            if (moved is not null)
+            {
+                moved.SetString("path", full);
+                VdfTextWriter.WriteFile(file, root);
+                continue;
+            }
 
             var next = container.Children
                 .Select(c => int.TryParse(c.Key, out var n) ? n + 1 : 0)

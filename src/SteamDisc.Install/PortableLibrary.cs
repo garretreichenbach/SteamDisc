@@ -5,6 +5,7 @@ using SteamDisc.Core.Diagnostics;
 using SteamDisc.Core.Progress;
 using SteamDisc.Core.Protocol;
 using SteamDisc.Core.Steam;
+using SteamDisc.Core.Theming;
 
 namespace SteamDisc.Install;
 
@@ -53,6 +54,9 @@ public static class PortableLibrary
 
     /// <summary>Name the runtime takes on the drive root; running it offers play or install.</summary>
     public const string SetupExecutableName = "Setup.exe";
+
+    /// <summary>Theme folder at the drive root, which skins the drive's Setup.exe like a disc's.</summary>
+    public const string ThemeFolderName = "theme";
 
     private const int MegaByte = 1024 * 1024;
 
@@ -154,13 +158,19 @@ public static class PortableLibrary
 
     /// <summary>
     /// Writes a game onto a drive as a portable library, with the runtime alongside so the
-    /// drive offers play-or-install wherever it is plugged in.
+    /// drive offers play-or-install wherever it is plugged in, skinned by <paramref name="theme"/>.
     /// </summary>
+    /// <remarks>
+    /// A drive has one Setup.exe but may hold several games, so the theme is the last game
+    /// written's — the same "last one wins" as the drive's label would be.
+    /// </remarks>
     public static async Task<LibraryCopyResult> WriteAsync(
         InstalledApp game,
         string driveRoot,
         IReadOnlyCollection<string>? excludeRelativePaths = null,
         string? runtimeExecutablePath = null,
+        ThemeDefinition? theme = null,
+        IReadOnlyDictionary<string, string>? artwork = null,
         IProgress<OperationProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -182,6 +192,19 @@ public static class PortableLibrary
         if (runtimeExecutablePath is { Length: > 0 } runtime && File.Exists(runtime))
         {
             File.Copy(runtime, Path.Combine(library.Path, SetupExecutableName), overwrite: true);
+        }
+
+        if (theme is not null)
+        {
+            // Start clean: art left over from the previous game would otherwise satisfy this
+            // theme's asset names and skin the drive with the wrong game.
+            var themeFolder = Path.Combine(library.Path, ThemeFolderName);
+            if (Directory.Exists(themeFolder))
+            {
+                Directory.Delete(themeFolder, recursive: true);
+            }
+
+            BuiltInThemes.WriteThemeFolder(theme, themeFolder, artwork);
         }
 
         return result;
@@ -244,6 +267,53 @@ public static class PortableLibrary
         }
     }
 
+    /// <summary>
+    /// True when this drive was set up to play from on this PC but Steam no longer lists it at
+    /// its current path: Steam dropped the library, or the drive came back under a new letter.
+    /// Setup then re-adds it straight away instead of asking play-or-install again.
+    /// </summary>
+    public static bool NeedsReRegistration(SteamInstallation steam, SteamLibrary library)
+        => !IsRegistered(steam, library) && PlayedHere().Contains(library.EnsureLibraryFolderFile());
+
+    private static bool IsRegistered(SteamInstallation steam, SteamLibrary library)
+        => steam.GetLibraries().Any(l => SteamInstallation.PathComparer.Equals(
+            Path.TrimEndingDirectorySeparator(l.Path), Path.TrimEndingDirectorySeparator(library.Path)));
+
+    /// <summary>
+    /// Content ids of drives chosen for play on this PC. Kept on the PC, not the drive, because
+    /// "played here" is a fact about this machine's Steam.
+    /// </summary>
+    private static string PlayedHerePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SteamDisc", "played-drives.txt");
+
+    private static HashSet<string> PlayedHere()
+    {
+        try
+        {
+            return new HashSet<string>(File.ReadAllLines(PlayedHerePath), StringComparer.Ordinal);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+    }
+
+    private static void RememberPlayedHere(string contentId)
+    {
+        try
+        {
+            if (!PlayedHere().Contains(contentId))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(PlayedHerePath)!);
+                File.AppendAllLines(PlayedHerePath, new[] { contentId });
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Only costs the auto re-register shortcut; the drive itself is registered.
+        }
+    }
+
     /// <summary>Adds the drive to this machine's Steam so its games play from it.</summary>
     public static async Task<PortableOutcome> RegisterAsync(
         SteamInstallation steam,
@@ -253,12 +323,14 @@ public static class PortableLibrary
         IProcessRunner? processRunner = null,
         CancellationToken cancellationToken = default)
     {
-        var known = steam.GetLibraries().Any(l => SteamInstallation.PathComparer.Equals(
-            Path.TrimEndingDirectorySeparator(l.Path), Path.TrimEndingDirectorySeparator(library.Path)));
-        if (known)
+        var contentId = library.EnsureLibraryFolderFile();
+        if (IsRegistered(steam, library))
         {
+            RememberPlayedHere(contentId);
             return new PortableOutcome(true, $"Steam already uses '{library.Path}'. Its games are ready to play.");
         }
+
+        var returning = PlayedHere().Contains(contentId);
 
         // Steam overwrites libraryfolders.vdf from memory on exit, so it has to be closed around the edit.
         var cli = new SteamCliDriver(steam, processRunner);
@@ -271,14 +343,17 @@ public static class PortableLibrary
             return new PortableOutcome(false, "Steam is still running, so the drive was not added.");
         }
 
-        steam.RegisterLibrary(library.Path, library.EnsureLibraryFolderFile());
+        steam.RegisterLibrary(library.Path, contentId);
+        RememberPlayedHere(contentId);
         logger?.Info($"Registered portable library '{library.Path}'.");
         StartSteam(cli);
 
         return new PortableOutcome(
             true,
-            $"Added '{library.Path}' to Steam. Its games will appear in your library and play from the drive. " +
-            "Keep the drive on the same letter; Steam finds the library by path.");
+            returning
+                ? $"Steam had lost track of this drive, so it was added back at '{library.Path}'. Its games are ready to play."
+                : $"Added '{library.Path}' to Steam. Its games will appear in your library and play from the drive. " +
+                  "Keep the drive on the same letter; Steam finds the library by path.");
     }
 
     /// <summary>Copies every game on the drive into a library on this machine.</summary>

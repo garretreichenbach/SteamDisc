@@ -247,12 +247,23 @@ internal static class RuntimeProgram
             return 3;
         }
 
+        var themeFolder = Path.Combine(portable.Path, PortableLibrary.ThemeFolderName);
+        var theme = Theme.LoadOrDefault(Directory.Exists(themeFolder) ? themeFolder : null, out _);
+        var host = new ConsoleInstallHost(theme, options.AssumeYes);
+
+        // Played from here before and Steam has since dropped it: re-add without asking again.
+        if (PortableLibrary.NeedsReRegistration(steam, portable))
+        {
+            var readded = await PortableLibrary.RegisterAsync(steam, portable, host, logger).ConfigureAwait(false);
+            Console.WriteLine(readded.Message);
+            return readded.Succeeded ? 0 : 1;
+        }
+
         Console.Write("Testing drive speed... ");
         var speed = PortableLibrary.MeasureReadSpeed(portable);
         var fast = speed is null or >= PortableLibrary.PlayableMegabytesPerSecond;
         Console.WriteLine(speed is { } s ? $"{s:0} MB/s" : "could not measure");
 
-        var host = new ConsoleInstallHost(Theme.Default, options.AssumeYes);
 
         // Each question is phrased so "no" (the default) is the recommendation, and --yes
         // accepts the recommendation rather than flipping it.

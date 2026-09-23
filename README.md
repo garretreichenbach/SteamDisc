@@ -164,13 +164,13 @@ A USB 3.0 stick can do something a disc can't: hold the game **uncompressed, as 
 library**, so you can play it straight from the stick.
 
 ```bash
-dotnet run --project src/SteamDisc.Builder -- usb 620 --drive E:\ --runtime publish/runtime/Setup.exe
+dotnet run --project src/SteamDisc.Builder -- package 620 --media usb --out E:\ --runtime publish/runtime/Setup.exe
 ```
 
 This copies the game into `E:\steamapps\common\…` with the same transplanted manifest a disc
 carries, plus Steam's `libraryfolder.vdf` marker and `Setup.exe` at the root. If a copy is
 interrupted, run it again and it resumes (files with the same size and timestamp are skipped). You
-can put several games on one stick. In the GUI, use **Write to USB…**.
+can put several games on one stick. In the GUI, pick **USB drive** as the media and the drive as the output folder.
 
 When `Setup.exe` runs from the stick, it measures how fast the drive reads and offers two choices:
 

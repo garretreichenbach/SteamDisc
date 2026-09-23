@@ -121,7 +121,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(BuildCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
-    [NotifyCanExecuteChangedFor(nameof(WriteUsbCommand))]
     private GameItem? _selectedGame;
 
     [ObservableProperty]
@@ -223,7 +222,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(TestInstallCommand))]
     [NotifyCanExecuteChangedFor(nameof(AutoFetchAllCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
-    [NotifyCanExecuteChangedFor(nameof(WriteUsbCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -330,7 +328,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedCompressionChanged(ArchiveCompression value) => UpdateEstimate();
 
-    partial void OnSelectedMediumChanged(OpticalMedium value) => UpdateEstimate();
+    partial void OnSelectedMediumChanged(OpticalMedium value)
+    {
+        OnPropertyChanged(nameof(IsUsb));
+        OnPropertyChanged(nameof(BuildButtonText));
+
+        // A USB write turns its target into a Steam library, so it must be a drive the user
+        // chose — never the Desktop folder suggested for disc staging.
+        if (value.IsUsbDrive && OutputFolder == _autoSuggestedOutput)
+        {
+            OutputFolder = string.Empty;
+        }
+        else if (!value.IsUsbDrive && SelectedGame is { } game)
+        {
+            SuggestOutputFolder(game);
+        }
+
+        UpdateEstimate();
+    }
+
+    /// <summary>USB is a target like the discs, but it copies the game raw rather than packaging it.</summary>
+    public bool IsUsb => SelectedMedium.IsUsbDrive;
+
+    public string BuildButtonText => IsUsb ? "Write to USB" : "Build disc";
 
     partial void OnSelectedGameChanged(GameItem? value)
     {
@@ -411,6 +431,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Excluded files come straight off the top before compression is even considered.
         var uncompressed = Math.Max(0, game.Candidate.ManifestSize - _excludedBytes);
 
+        if (IsUsb)
+        {
+            EstimateText = $"{FormatDecimalBytes(uncompressed)} copied uncompressed · playable straight from the drive";
+            return;
+        }
+
         // Deliberately pessimistic. Game data is largely pre-compressed already — a real build
         // measured 0.83 at Maximum — so an optimistic ratio promises a fit that only fails once
         // the disc is burned. Predicting one disc too many is much the cheaper mistake.
@@ -456,6 +482,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void SuggestOutputFolder(GameItem game)
     {
+        if (IsUsb)
+        {
+            return;
+        }
+
         // Only replace a suggestion of our own; never stomp a folder the user typed.
         if (!string.IsNullOrEmpty(OutputFolder) && OutputFolder != _autoSuggestedOutput)
         {
@@ -654,6 +685,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             theme.Strings[ThemeResources.UpdateNoticeKey] = UpdateNoticeText.Trim();
         }
 
+        if (IsUsb)
+        {
+            await WriteUsbAsync(theme);
+            return;
+        }
+
         var request = new PackageRequest(SelectedGame.Candidate, OutputFolder, SelectedMedium)
         {
             Compression = SelectedCompression,
@@ -690,32 +727,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// Copies the game uncompressed onto a USB drive as a Steam library — no disc, no archive.
-    /// The drive's Setup.exe then offers playing from it or installing to a PC.
+    /// Chosen by picking USB as the media; the drive's Setup.exe then offers playing from it or installing to a PC.
     /// </summary>
-    [RelayCommand(CanExecute = nameof(CanWriteUsb))]
-    private async Task WriteUsbAsync()
+    private async Task WriteUsbAsync(ThemeDefinition theme)
     {
         if (SelectedGame is null)
         {
             return;
         }
 
-        var drive = await Storage.PickFolderAsync("Choose the USB drive to write to");
-        if (drive is null)
-        {
-            return;
-        }
-
+        var drive = OutputFolder;
         IsBusy = true;
+        CanBuildIso = false;
+        CanBurn = false;
         ResetProgress("Writing to USB…");
 
         var app = SelectedGame.Candidate.App;
         var runtime = string.IsNullOrWhiteSpace(RuntimeExePath) ? null : RuntimeExePath;
+        var artwork = CollectArtwork();
         var progress = new Progress<OperationProgress>(OnProgress);
         try
         {
             var result = await Task.Run(() =>
-                PortableLibrary.WriteAsync(app, drive, _fileExclusions, runtime, progress));
+                PortableLibrary.WriteAsync(app, drive, _fileExclusions, runtime, theme, artwork, progress));
             var speed = await Task.Run(() => PortableLibrary.MeasureReadSpeed(result.Library));
 
             var lines = new List<string>
@@ -744,8 +778,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ClearProgress();
         }
     }
-
-    private bool CanWriteUsb => !IsBusy && SelectedGame is not null;
 
     [RelayCommand(CanExecute = nameof(CanMakeIso))]
     private async Task BuildIsoAsync()

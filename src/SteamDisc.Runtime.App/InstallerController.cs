@@ -114,29 +114,7 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             _tokens["disc"] = _manifest.Disc.Number.ToString(CultureInfo.InvariantCulture);
             _tokens["discCount"] = _manifest.Disc.Of.ToString(CultureInfo.InvariantCulture);
 
-            ThemeResources.Apply(this, _theme.Definition, _tokens);
-            if (_window is not null)
-            {
-                _window.Title = $"{_manifest.Title} — Setup";
-
-                // The skin is clipped to rounded corners; paint the window beneath it in the
-                // theme's own background so the corners blend instead of showing system chrome.
-                _window.Background = BackgroundBrush;
-            }
-
-            (_window as MainWindow)?.SetLayout(_theme.Layout);
-
-            // Decode art off the UI thread, then assign on it.
-            var backgroundPath = _theme.BackgroundPath;
-            var logoPath = _theme.LogoPath;
-            var coverPath = _theme.CoverPath;
-            var art = await Task.Run(() => (
-                Background: ThemeResources.LoadBitmap(backgroundPath),
-                Logo: ThemeResources.LoadBitmap(logoPath),
-                Cover: ThemeResources.LoadBitmap(coverPath)));
-            BackgroundImage = art.Background;
-            LogoImage = art.Logo;
-            CoverImage = art.Cover;
+            await ApplySkinAsync(_manifest.Title);
 
             _steam = await Task.Run(() => SteamLocator.Locate(_args.SteamPath));
             if (_steam is null)
@@ -395,17 +373,36 @@ public sealed class InstallerController : SkinnedInstallerViewModel
 
         GameTitle = _portableApps.Count == 1 ? _portableApps[0].Manifest.Name : $"{_portableApps.Count} games";
         _tokens["title"] = GameTitle;
-        ThemeResources.Apply(this, _theme.Definition, _tokens);
-        if (_window is not null)
+
+        // The Builder writes the last game's theme and art to the drive root, as a disc carries its own.
+        var themeFolder = Path.Combine(portable.Path, PortableLibrary.ThemeFolderName);
+        _theme = Theme.LoadOrDefault(Directory.Exists(themeFolder) ? themeFolder : null, out var themeError);
+        if (themeError is not null)
         {
-            _window.Title = GameTitle + " — Setup";
-            _window.Background = BackgroundBrush;
+            _logger.Warn("Theme fell back to the default: " + themeError);
         }
+
+        if (_portableApps.Count == 1)
+        {
+            StoreUrl = $"https://store.steampowered.com/app/{_portableApps[0].AppId}/";
+            ShowStoreButton = true;
+        }
+
+        await ApplySkinAsync(GameTitle);
 
         _steam = await Task.Run(() => SteamLocator.Locate(_args.SteamPath));
         if (_steam is null)
         {
             Fail("Steam not found", "Install Steam and sign in, then run Setup again.");
+            return;
+        }
+
+        // Played from here before and Steam has since dropped it: re-add without asking again.
+        var steam = _steam;
+        if (await Task.Run(() => PortableLibrary.NeedsReRegistration(steam, portable)))
+        {
+            PlayFromDrive = true;
+            await StartPortableAsync(portable, portable);
             return;
         }
 
@@ -435,6 +432,34 @@ public sealed class InstallerController : SkinnedInstallerViewModel
         _canProceed = true;
         IsPrimaryEnabled = true;
         Stage = InstallerStage.Welcome;
+    }
+
+    /// <summary>Applies the loaded theme: brushes, strings, layout and decoded artwork.</summary>
+    private async Task ApplySkinAsync(string title)
+    {
+        ThemeResources.Apply(this, _theme.Definition, _tokens);
+        if (_window is not null)
+        {
+            _window.Title = $"{title} — Setup";
+
+            // The skin is clipped to rounded corners; paint the window beneath it in the
+            // theme's own background so the corners blend instead of showing system chrome.
+            _window.Background = BackgroundBrush;
+        }
+
+        (_window as MainWindow)?.SetLayout(_theme.Layout);
+
+        // Decode art off the UI thread, then assign on it.
+        var backgroundPath = _theme.BackgroundPath;
+        var logoPath = _theme.LogoPath;
+        var coverPath = _theme.CoverPath;
+        var art = await Task.Run(() => (
+            Background: ThemeResources.LoadBitmap(backgroundPath),
+            Logo: ThemeResources.LoadBitmap(logoPath),
+            Cover: ThemeResources.LoadBitmap(coverPath)));
+        BackgroundImage = art.Background;
+        LogoImage = art.Logo;
+        CoverImage = art.Cover;
     }
 
     private void UpdatePortablePrimary()

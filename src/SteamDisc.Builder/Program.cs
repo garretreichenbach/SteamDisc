@@ -39,7 +39,6 @@ internal static class BuilderProgram
                 "inspect" => GameCommands.Inspect(command),
                 "select" => SelectionCommands.Select(command),
                 "package" => await PackageCommands.PackageAsync(command, logger).ConfigureAwait(false),
-                "usb" => await PackageCommands.UsbAsync(command, logger).ConfigureAwait(false),
                 "iso" => await PackageCommands.BuildIsoAsync(command).ConfigureAwait(false),
                 "burn" => await PackageCommands.BurnAsync(command).ConfigureAwait(false),
                 "verify" => await PackageCommands.VerifyAsync(command).ConfigureAwait(false),
@@ -135,7 +134,6 @@ internal static class BuilderProgram
               inspect <appid|name>          Show a game's manifest, depots and advisories
               select <appid|name>           Write an editable list of what to pack (see 'select' options)
               package <appid|name>          Package a game into disc staging folders
-              usb <appid|name> --drive <X:\> Write a game to a USB drive to play from directly
               iso <staging-folder>          Build a burnable ISO from a staging folder
               burn <iso>                    Hand an ISO to a disc burner
               verify <disc-folder>          Check a built disc without installing it
@@ -160,7 +158,8 @@ internal static class BuilderProgram
               --include-all                 Start with everything included (skip the heuristics)
 
             package options:
-              --media <id>                  Target media (default bd-r); see 'media'
+              --media <id>                  Target media (default bd-r); see 'media'. 'usb' copies the
+                                            game uncompressed to the drive given by --out, playable from it
               --compression <level>         store | fast | balanced | maximum (default fast)
               --format <id>                 sdz (default) or 7z
               --volume-size <size>          Override the volume size, e.g. 2g
@@ -173,12 +172,7 @@ internal static class BuilderProgram
               --no-art                      Do not fetch artwork
               --no-hashes                   Skip the SHA-256 sidecar
               --validate                    Ask Steam to verify files after installing
-
-            usb options:
-              --drive <path>                Drive (or folder) to turn into a portable Steam library
-              --selection <path>            Only copy what a 'select' file marks as included
-              --runtime <path>              Published Setup.exe; offers play-from-drive or install on any PC
-              --register                    Add the drive to this PC's Steam (Steam must be closed)
+              --register                    With --media usb: add the drive to this PC's Steam (Steam closed)
 
             covers options:
               --template <id>               Template to use (default sgc-dvd)
@@ -194,7 +188,7 @@ internal static class BuilderProgram
               steamdisc list --media dvd
               steamdisc select 620 --out ~/discs/portal2.selection.json
               steamdisc package 620 --media bd-r --out ~/discs/portal2 --selection ~/discs/portal2.selection.json
-              steamdisc usb 620 --drive E:\ --runtime publish/runtime/Setup.exe
+              steamdisc package 620 --media usb --out E:\ --runtime publish/runtime/Setup.exe
               steamdisc iso ~/discs/portal2/disc --out ~/discs/portal2.iso
               steamdisc covers new --game 620 --template blank-bluray --out ~/discs/portal2/cover.json
               steamdisc covers render ~/discs/portal2/cover.json

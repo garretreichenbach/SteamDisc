@@ -27,10 +27,19 @@ public sealed record OpticalMedium(string Id, string Name, long CapacityBytes)
     /// <summary>A virtual medium for "one image, however large", used for ISO-only output.</summary>
     public static OpticalMedium Unlimited => new("unlimited", "No limit (image only)", long.MaxValue);
 
+    /// <summary>
+    /// Not optical, and not packaged: the game is copied uncompressed onto a USB drive as a
+    /// Steam library that can be played from directly or installed from.
+    /// </summary>
+    public static OpticalMedium Usb => new("usb", "USB drive (uncompressed, playable)", long.MaxValue);
+
     public static IReadOnlyList<OpticalMedium> All { get; } = new[]
     {
-        Cd, Dvd, DvdDl, BluRay, BluRayDl, BluRayXl100, BluRayXl128, Unlimited,
+        Cd, Dvd, DvdDl, BluRay, BluRayDl, BluRayXl100, BluRayXl128, Unlimited, Usb,
     };
+
+    /// <summary>True for <see cref="Usb"/>, which writes a library instead of building a disc.</summary>
+    public bool IsUsbDrive => Id == "usb";
 
     public static OpticalMedium? Find(string id)
         => All.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));

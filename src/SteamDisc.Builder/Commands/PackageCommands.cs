@@ -32,6 +32,13 @@ internal static class PackageCommands
             return 1;
         }
 
+        // Checked before the art fetch, so a missing drive fails fast rather than after the network.
+        if (medium.IsUsbDrive && (command.Value("out") is not { Length: > 0 } drive || !Directory.Exists(drive)))
+        {
+            Console.Error.WriteLine("With --media usb, --out must be the USB drive, e.g. --out E:\\");
+            return 1;
+        }
+
         var output = command.Value("out")
                      ?? Path.Combine(Environment.CurrentDirectory, Sanitise(game.Name));
 
@@ -69,6 +76,11 @@ internal static class PackageCommands
         if (!command.Has("no-art"))
         {
             (artwork, sidecar) = await FetchArtworkAsync(game, command, logger).ConfigureAwait(false);
+        }
+
+        if (medium.IsUsbDrive)
+        {
+            return await WriteUsbAsync(command, steam, game, exclusions, theme, artwork, logger).ConfigureAwait(false);
         }
 
         Console.WriteLine($"Packaging {game.Name} ({game.AppId})");
@@ -142,34 +154,20 @@ internal static class PackageCommands
         return 0;
     }
 
-    /// <summary>Writes a game onto a USB drive as a Steam library it can be played from directly.</summary>
-    public static async Task<int> UsbAsync(CommandLine command, ISteamDiscLogger logger)
+    /// <summary>
+    /// <c>package --media usb</c>: copies the game uncompressed onto a USB drive as a Steam
+    /// library it can be played from directly, instead of packaging it for disc.
+    /// </summary>
+    private static async Task<int> WriteUsbAsync(
+        CommandLine command,
+        SteamInstallation steam,
+        GameCandidate game,
+        IReadOnlyCollection<string>? exclusions,
+        ThemeDefinition theme,
+        IReadOnlyDictionary<string, string>? artwork,
+        ISteamDiscLogger logger)
     {
-        var steam = SteamLocator.LocateRequired(command.Value("steam-path"));
-        var game = GameCommands.Resolve(steam, command.PositionalAt(1));
-        if (game is null)
-        {
-            return 1;
-        }
-
-        var drive = command.Value("drive");
-        if (string.IsNullOrWhiteSpace(drive) || !Directory.Exists(drive))
-        {
-            Console.Error.WriteLine("Specify the USB drive to write to, e.g. --drive E:\\");
-            return 1;
-        }
-
-        IReadOnlyCollection<string>? exclusions = null;
-        if (command.Value("selection") is { Length: > 0 } selectionPath)
-        {
-            var selection = SelectionCommands.LoadForPackage(selectionPath, game);
-            if (selection is null)
-            {
-                return 1;
-            }
-
-            exclusions = selection.DeriveExclusions();
-        }
+        var drive = command.Value("out")!;
 
         Console.WriteLine($"Writing {game.Name} ({game.AppId}) to {drive} as a playable Steam library");
         Console.WriteLine($"  Source: {game.InstallPath}");
@@ -181,7 +179,7 @@ internal static class PackageCommands
         try
         {
             result = await PortableLibrary
-                .WriteAsync(game.App, drive, exclusions, command.Value("runtime"), progress)
+                .WriteAsync(game.App, drive, exclusions, command.Value("runtime"), theme, artwork, progress)
                 .ConfigureAwait(false);
         }
         finally
