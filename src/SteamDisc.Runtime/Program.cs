@@ -51,6 +51,15 @@ internal static class RuntimeProgram
     private static async Task<int> InstallAsync(RuntimeOptions options, ISteamDiscLogger logger, string logPath)
     {
         var manifestPath = Path.Combine(options.DiscRoot, PayloadManifest.FileName);
+
+        // Run from a USB drive the Builder wrote a game onto: there is nothing to install, only
+        // a library to point Steam at.
+        var portable = new SteamLibrary(options.DiscRoot);
+        if (!File.Exists(manifestPath) && portable.IsPortable)
+        {
+            return await RunPortableAsync(options, portable, logger).ConfigureAwait(false);
+        }
+
         if (!File.Exists(manifestPath))
         {
             Console.Error.WriteLine($"No {PayloadManifest.FileName} found in '{options.DiscRoot}'.");
@@ -96,7 +105,7 @@ internal static class RuntimeProgram
             return 3;
         }
 
-        var library = SelectLibrary(libraries, options, manifest);
+        var library = SelectLibrary(libraries, options, manifest.SizeOnDisk);
         if (library is null)
         {
             Console.WriteLine("Cancelled.");
@@ -222,10 +231,76 @@ internal static class RuntimeProgram
         }
     }
 
+    /// <summary>
+    /// A USB drive holding a raw Steam library: offer to play from it or install from it,
+    /// recommending whichever the drive's measured speed suits.
+    /// </summary>
+    private static async Task<int> RunPortableAsync(RuntimeOptions options, SteamLibrary portable, ISteamDiscLogger logger)
+    {
+        var apps = portable.GetInstalledApps();
+        Console.WriteLine($"Games on this drive: {string.Join(", ", apps.Select(a => a.Manifest.Name))}");
+
+        var steam = SteamLocator.Locate(options.SteamPath);
+        if (steam is null)
+        {
+            Console.Error.WriteLine("Steam could not be found on this machine. Install Steam and sign in first.");
+            return 3;
+        }
+
+        Console.Write("Testing drive speed... ");
+        var speed = PortableLibrary.MeasureReadSpeed(portable);
+        var fast = speed is null or >= PortableLibrary.PlayableMegabytesPerSecond;
+        Console.WriteLine(speed is { } s ? $"{s:0} MB/s" : "could not measure");
+
+        var host = new ConsoleInstallHost(Theme.Default, options.AssumeYes);
+
+        // Each question is phrased so "no" (the default) is the recommendation, and --yes
+        // accepts the recommendation rather than flipping it.
+        var play = options.AssumeYes
+            ? fast
+            : fast
+                ? !await host.ConfirmAsync("Fast enough to play from. Install to this PC instead?", CancellationToken.None)
+                    .ConfigureAwait(false)
+                : await host.ConfirmAsync("Slow for playing from; installing is recommended. Play from the drive anyway?", CancellationToken.None)
+                    .ConfigureAwait(false);
+
+        PortableOutcome outcome;
+        if (play)
+        {
+            outcome = await PortableLibrary.RegisterAsync(steam, portable, host, logger).ConfigureAwait(false);
+        }
+        else
+        {
+            var libraries = steam.GetLibraries()
+                .Where(l => !SteamInstallation.PathComparer.Equals(l.Path, portable.Path))
+                .ToList();
+            var target = SelectLibrary(libraries, options, apps.Sum(a => a.Manifest.SizeOnDisk));
+            if (target is null)
+            {
+                Console.WriteLine("Cancelled.");
+                return 4;
+            }
+
+            var bar = new ConsoleProgressBar();
+            try
+            {
+                outcome = await PortableLibrary.InstallAsync(steam, portable, target, host, bar, options.Validate, logger).ConfigureAwait(false);
+            }
+            finally
+            {
+                bar.Complete();
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(outcome.Message);
+        return outcome.Succeeded ? 0 : 1;
+    }
+
     private static SteamLibrary? SelectLibrary(
         IReadOnlyList<SteamLibrary> libraries,
         RuntimeOptions options,
-        PayloadManifest manifest)
+        long sizeOnDisk)
     {
         if (options.LibraryPath is { Length: > 0 } explicitPath)
         {
@@ -237,7 +312,7 @@ internal static class RuntimeProgram
             // Prefer a library with room over simply the first one.
             return libraries
                        .OrderByDescending(l => l.GetAvailableFreeBytes() ?? 0)
-                       .FirstOrDefault(l => (l.GetAvailableFreeBytes() ?? long.MaxValue) > manifest.SizeOnDisk)
+                       .FirstOrDefault(l => (l.GetAvailableFreeBytes() ?? long.MaxValue) > sizeOnDisk)
                    ?? libraries[0];
         }
 

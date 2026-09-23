@@ -92,11 +92,7 @@ public sealed class SteamInstallation
                 continue;
             }
 
-            var container = string.Equals(root.Key, "libraryfolders", StringComparison.OrdinalIgnoreCase)
-                ? root
-                : root.Find("libraryfolders") ?? root;
-
-            foreach (var child in container.Children)
+            foreach (var child in LibraryFoldersContainer(root).Children)
             {
                 // Keys are ordinals ("0", "1", ...). Older files also carry
                 // "TimeNextStatsReport"/"ContentStatsID" siblings, which are not libraries.
@@ -117,6 +113,64 @@ public sealed class SteamInstallation
 
         return paths;
     }
+
+    /// <summary>
+    /// Adds a library folder to <c>libraryfolders.vdf</c>, which is how a portable library on a
+    /// USB drive becomes visible to this client. Returns false if it was already listed.
+    /// </summary>
+    /// <remarks>
+    /// Steam rewrites this file from memory when it exits, so the client must be closed first
+    /// or the entry is silently lost. Callers own that check. Only the keys Steam needs to
+    /// accept the entry are written; it fills in the rest (sizes, app list) on its next scan.
+    /// </remarks>
+    public bool RegisterLibrary(string libraryPath, string contentId)
+    {
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(libraryPath));
+        if (ReadLibraryFolderPaths().Any(p =>
+                PathComparer.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(p)), full)))
+        {
+            return false;
+        }
+
+        // Modern clients keep the list in steamapps/ and mirror it in config/; update whichever exist.
+        var files = new[]
+            {
+                Path.Combine(SteamAppsPath, "libraryfolders.vdf"),
+                Path.Combine(ConfigPath, "libraryfolders.vdf"),
+            }
+            .Where(File.Exists)
+            .DefaultIfEmpty(Path.Combine(SteamAppsPath, "libraryfolders.vdf"))
+            .ToList();
+
+        foreach (var file in files)
+        {
+            // A file we cannot parse is left alone rather than replaced: it is Steam's, not ours.
+            var root = File.Exists(file) ? VdfTextReader.ParseFile(file) : KvNode.Object("libraryfolders");
+            var container = LibraryFoldersContainer(root);
+
+            var next = container.Children
+                .Select(c => int.TryParse(c.Key, out var n) ? n + 1 : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            var entry = KvNode.Object(next.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            entry.SetString("path", full);
+            entry.SetString("label", string.Empty);
+            entry.SetString("contentid", contentId);
+            entry.SetString("totalsize", "0");
+            entry.Add(KvNode.Object("apps"));
+            container.Add(entry);
+
+            VdfTextWriter.WriteFile(file, root);
+        }
+
+        return true;
+    }
+
+    private static KvNode LibraryFoldersContainer(KvNode root)
+        => string.Equals(root.Key, "libraryfolders", StringComparison.OrdinalIgnoreCase)
+            ? root
+            : root.Find("libraryfolders") ?? root;
 
     /// <summary>Every app installed across every library of this client.</summary>
     public IReadOnlyList<InstalledApp> GetInstalledApps()
@@ -182,7 +236,7 @@ public sealed class SteamInstallation
     /// <summary>The account most likely to be the one currently signed in, if any.</summary>
     public SteamUser? GetMostRecentUser() => GetKnownUsers().FirstOrDefault();
 
-    internal static StringComparer PathComparer =>
+    public static StringComparer PathComparer =>
         OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;

@@ -16,6 +16,7 @@ using SteamDisc.Core.Steam;
 using SteamDisc.Core.Theming;
 using SteamDisc.Imaging;
 using SteamDisc.Imaging.Iso;
+using SteamDisc.Install;
 using SteamDisc.Skin;
 
 namespace SteamDisc.Builder.App.ViewModels;
@@ -120,6 +121,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(BuildCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
+    [NotifyCanExecuteChangedFor(nameof(WriteUsbCommand))]
     private GameItem? _selectedGame;
 
     [ObservableProperty]
@@ -221,6 +223,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(TestInstallCommand))]
     [NotifyCanExecuteChangedFor(nameof(AutoFetchAllCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditFilesCommand))]
+    [NotifyCanExecuteChangedFor(nameof(WriteUsbCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -684,6 +687,65 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private bool CanBuild => !IsBusy && SelectedGame is not null && !string.IsNullOrWhiteSpace(OutputFolder);
+
+    /// <summary>
+    /// Copies the game uncompressed onto a USB drive as a Steam library — no disc, no archive.
+    /// The drive's Setup.exe then offers playing from it or installing to a PC.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanWriteUsb))]
+    private async Task WriteUsbAsync()
+    {
+        if (SelectedGame is null)
+        {
+            return;
+        }
+
+        var drive = await Storage.PickFolderAsync("Choose the USB drive to write to");
+        if (drive is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ResetProgress("Writing to USB…");
+
+        var app = SelectedGame.Candidate.App;
+        var runtime = string.IsNullOrWhiteSpace(RuntimeExePath) ? null : RuntimeExePath;
+        var progress = new Progress<OperationProgress>(OnProgress);
+        try
+        {
+            var result = await Task.Run(() =>
+                PortableLibrary.WriteAsync(app, drive, _fileExclusions, runtime, progress));
+            var speed = await Task.Run(() => PortableLibrary.MeasureReadSpeed(result.Library));
+
+            var lines = new List<string>
+            {
+                $"Wrote {app.Manifest.Name} to {result.Library.Path} ({GameItem.FormatBytes(result.Bytes)}).",
+                speed is { } s
+                    ? $"Drive reads at {s:0} MB/s — " + (s >= PortableLibrary.PlayableMegabytesPerSecond
+                        ? "fast enough to play from directly."
+                        : "better installed from than played from.")
+                    : "Drive speed could not be measured.",
+                runtime is null
+                    ? "No Setup.exe was located, so the drive has no play-or-install launcher."
+                    : $"Run {PortableLibrary.SetupExecutableName} from the drive on any PC to play from it or install it.",
+            };
+            lines.AddRange(result.Warnings);
+            StatusText = string.Join(Environment.NewLine, lines);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("USB write failed.", ex);
+            StatusText = "USB write failed: " + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            ClearProgress();
+        }
+    }
+
+    private bool CanWriteUsb => !IsBusy && SelectedGame is not null;
 
     [RelayCommand(CanExecute = nameof(CanMakeIso))]
     private async Task BuildIsoAsync()

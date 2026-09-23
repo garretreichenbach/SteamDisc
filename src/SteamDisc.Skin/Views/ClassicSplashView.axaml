@@ -92,6 +92,9 @@
                       MinWidth="320" />
           </StackPanel>
           <StackPanel Spacing="1" Margin="0,2,0,0">
+            <CheckBox Content="{Binding PlayFromDriveOptionText}" IsChecked="{Binding PlayFromDrive}"
+                      IsVisible="{Binding ShowPlayFromDriveOption}"
+                      Foreground="{Binding TextBrush}" />
             <CheckBox Content="{Binding LaunchOptionText}" IsChecked="{Binding LaunchWhenFinished}"
                       Foreground="{Binding TextBrush}" />
             <CheckBox Content="{Binding VerifyOptionText}" IsChecked="{Binding VerifyAfterInstall}"

@@ -216,6 +216,8 @@
                     ToolTip.Tip="Run the disc's own Setup.exe against the staging folder before burning." />
             <Button Content="Build ISO" Command="{Binding BuildIsoCommand}" Padding="20,10" />
             <Button Content="Burn…" Command="{Binding BurnCommand}" Padding="20,10" />
+            <Button Content="Write to USB…" Command="{Binding WriteUsbCommand}" Padding="20,10"
+                    ToolTip.Tip="Copy the game uncompressed onto a USB drive as a Steam library. Its Setup.exe offers playing from the drive or installing to a PC." />
           </StackPanel>
 
           <StackPanel Spacing="4" IsVisible="{Binding IsBusy}">

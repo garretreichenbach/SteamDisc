@@ -158,6 +158,40 @@ exist here would be files of 4 GB and over, and the payload already splits below
 ISO 9660 + Joliet is readable everywhere and is the better trade. Images are verified in the
 test suite by an independently written reader, and mount correctly on macOS.
 
+## USB drives
+
+A USB 3.0 stick can do something a disc can't: hold the game **uncompressed, as a Steam
+library**, so you can play it straight from the stick.
+
+```bash
+dotnet run --project src/SteamDisc.Builder -- usb 620 --drive E:\ --runtime publish/runtime/Setup.exe
+```
+
+This copies the game into `E:\steamapps\common\…` with the same transplanted manifest a disc
+carries, plus Steam's `libraryfolder.vdf` marker and `Setup.exe` at the root. If a copy is
+interrupted, run it again and it resumes (files with the same size and timestamp are skipped). You
+can put several games on one stick. In the GUI, use **Write to USB…**.
+
+When `Setup.exe` runs from the stick, it measures how fast the drive reads and offers two choices:
+
+- **Play from this drive.** Adds the drive to Steam's `libraryfolders.vdf`. Steam has to close
+  briefly for this, and it asks first. Recommended at 100 MB/s or more
+  (`PortableLibrary.PlayableMegabytesPerSecond`).
+- **Install to this PC.** A plain copy into a local library, with nothing to extract.
+
+A *compressed* stick is simply the disc package written to USB (`package … --out E:\game`). It
+can only be installed from, the same as a disc.
+
+Caveats:
+- **Format the stick NTFS.** FAT32 can't hold files of 4 GB or more; the writer refuses a game that
+  has one.
+- **Keep the drive letter fixed.** Steam finds the library by its path. Pin the letter in Disk
+  Management if Windows keeps changing it.
+- **Cheap sticks are fast at sequential reads and slow at random ones.** The speed check measures
+  only sequential reads, so games that stream an open world may stutter even on a stick that passes.
+- **Flash memory is not for archiving.** An unpowered stick slowly loses its charge over the years.
+  Keep the disc as the archive and use the stick for playing.
+
 ## Cover Studio
 
 A burned disc in a paper sleeve is not the retail-box experience the project is aiming at, so

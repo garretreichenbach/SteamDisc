@@ -35,6 +35,8 @@ public sealed class InstallerController : SkinnedInstallerViewModel
     private Theme _theme = Theme.Default;
     private CancellationTokenSource? _cts;
     private bool _canProceed;
+    private SteamLibrary? _portable;
+    private IReadOnlyList<InstalledApp> _portableApps = Array.Empty<InstalledApp>();
 
     public InstallerController(RuntimeArgs args, ISteamDiscLogger logger)
     {
@@ -71,6 +73,16 @@ public sealed class InstallerController : SkinnedInstallerViewModel
         try
         {
             var manifestPath = Path.Combine(_args.DiscRoot, PayloadManifest.FileName);
+
+            // Run from a USB drive the Builder wrote a game onto: nothing to install, only a
+            // library to point Steam at.
+            var portable = new SteamLibrary(_args.DiscRoot);
+            if (!File.Exists(manifestPath) && portable.IsPortable)
+            {
+                await LoadPortableAsync(portable);
+                return;
+            }
+
             if (!File.Exists(manifestPath))
             {
                 Fail("No disc found",
@@ -160,6 +172,10 @@ public sealed class InstallerController : SkinnedInstallerViewModel
         if (e.PropertyName == nameof(SelectedLibraryOption))
         {
             RunPreflight();
+        }
+        else if (e.PropertyName == nameof(PlayFromDrive) && _portable is not null)
+        {
+            UpdatePortablePrimary();
         }
     }
 
@@ -290,6 +306,13 @@ public sealed class InstallerController : SkinnedInstallerViewModel
 
     private async Task StartInstallAsync()
     {
+        if (_portable is not null && _steam is not null && SelectedLibraryOption is not null &&
+            _librariesByLabel.TryGetValue(SelectedLibraryOption, out var target))
+        {
+            await StartPortableAsync(_portable, target);
+            return;
+        }
+
         if (!_canProceed || _steam is null || _manifest is null || SelectedLibraryOption is null ||
             !_librariesByLabel.TryGetValue(SelectedLibraryOption, out var library))
         {
@@ -356,6 +379,113 @@ public sealed class InstallerController : SkinnedInstallerViewModel
         }
     }
 
+    /// <summary>
+    /// Run from a USB drive holding a raw Steam library: the welcome screen offers playing from
+    /// the drive or installing from it, preselecting whichever the drive's speed suits.
+    /// </summary>
+    private async Task LoadPortableAsync(SteamLibrary portable)
+    {
+        _portable = portable;
+        _portableApps = await Task.Run(portable.GetInstalledApps);
+        if (_portableApps.Count == 0)
+        {
+            Fail("No games found", $"'{portable.Path}' has a Steam library but no games in it.");
+            return;
+        }
+
+        GameTitle = _portableApps.Count == 1 ? _portableApps[0].Manifest.Name : $"{_portableApps.Count} games";
+        _tokens["title"] = GameTitle;
+        ThemeResources.Apply(this, _theme.Definition, _tokens);
+        if (_window is not null)
+        {
+            _window.Title = GameTitle + " — Setup";
+            _window.Background = BackgroundBrush;
+        }
+
+        _steam = await Task.Run(() => SteamLocator.Locate(_args.SteamPath));
+        if (_steam is null)
+        {
+            Fail("Steam not found", "Install Steam and sign in, then run Setup again.");
+            return;
+        }
+
+        var speed = await Task.Run(() => PortableLibrary.MeasureReadSpeed(portable));
+        var fast = speed is null or >= PortableLibrary.PlayableMegabytesPerSecond;
+        WelcomeBody = speed switch
+        {
+            null => "This drive holds a ready-to-play Steam library.",
+            _ when fast => $"This drive reads at {speed:0} MB/s — fast enough to play from directly.",
+            _ => $"This drive reads at {speed:0} MB/s. Games would load slowly from it, so installing is recommended.",
+        };
+
+        var locals = _steam.GetLibraries()
+            .Where(l => !SteamInstallation.PathComparer.Equals(l.Path, portable.Path))
+            .ToList();
+        if (locals.Count == 0)
+        {
+            Fail("No Steam library", $"No Steam libraries were found under '{_steam.RootPath}'.");
+            return;
+        }
+
+        BuildLibraryOptions(locals);
+        SizeText = "Size:  " + FormatBytes(_portableApps.Sum(a => a.Manifest.SizeOnDisk));
+        ShowPlayFromDriveOption = true;
+        PlayFromDrive = fast;
+        UpdatePortablePrimary();
+        _canProceed = true;
+        IsPrimaryEnabled = true;
+        Stage = InstallerStage.Welcome;
+    }
+
+    private void UpdatePortablePrimary()
+        => PrimaryButtonText = PlayFromDrive ? "Add to Steam" : _theme.String(ThemeStrings.InstallButton, _tokens);
+
+    private async Task StartPortableAsync(SteamLibrary portable, SteamLibrary target)
+    {
+        Stage = InstallerStage.Installing;
+        IsIndeterminate = true;
+        PhaseText = PlayFromDrive ? "Adding the drive to Steam…" : "Installing files…";
+        _cts = new CancellationTokenSource();
+
+        PortableOutcome outcome;
+        try
+        {
+            outcome = PlayFromDrive
+                ? await PortableLibrary.RegisterAsync(_steam!, portable, _host, _logger, cancellationToken: _cts.Token)
+                : await Task.Run(() => PortableLibrary.InstallAsync(
+                    _steam!, portable, target, _host, new Progress<OperationProgress>(OnProgress),
+                    VerifyAfterInstall, _logger, cancellationToken: _cts.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            Stage = InstallerStage.Welcome;
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Portable drive action failed.", ex);
+            Fail(_theme.String(ThemeStrings.ErrorHeading, _tokens), ex.Message);
+            return;
+        }
+
+        if (!outcome.Succeeded)
+        {
+            Fail(_theme.String(ThemeStrings.ErrorHeading, _tokens), outcome.Message);
+            return;
+        }
+
+        if (LaunchWhenFinished && _portableApps.Count == 1)
+        {
+            LaunchApp(_portableApps[0].AppId);
+        }
+
+        CompleteHeading = PlayFromDrive ? "Ready to play" : _theme.String(ThemeStrings.CompleteHeading, _tokens);
+        CompleteBody = outcome.Message;
+        PrimaryButtonText = "Close";
+        IsPrimaryEnabled = true;
+        Stage = InstallerStage.Complete;
+    }
+
     private void OnProgress(OperationProgress progress)
     {
         PhaseText = DescribePhase(progress.Phase);
@@ -382,9 +512,14 @@ public sealed class InstallerController : SkinnedInstallerViewModel
             return;
         }
 
+        LaunchApp(_manifest.AppId);
+    }
+
+    private void LaunchApp(uint appId)
+    {
         try
         {
-            new SteamProtocolDriver(SystemProcessRunner.Instance).Launch(_manifest.AppId);
+            new SteamProtocolDriver(SystemProcessRunner.Instance).Launch(appId);
         }
         catch (Exception ex)
         {
